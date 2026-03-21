@@ -1,0 +1,359 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Navbar from '@/components/Navigation/Navbar';
+import Link from 'next/link';
+import { useAuth } from '@/components/Auth/AuthContext';
+import { 
+  Play, 
+  CheckCircle, 
+  MessageSquare, 
+  Send, 
+  Sparkles, 
+  Trophy, 
+  ScanLine, 
+  FileText, 
+  ChevronRight, 
+  Video 
+} from 'lucide-react';
+import { getGeminiResponse, analyzeImage } from '@/lib/gemini';
+import CustomYTPlayer from '@/components/Video/CustomYTPlayer';
+import styles from './subject.module.css';
+
+export default function SubjectPage() {
+  const { id } = useParams();
+  const router = useRouter();
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'video' | 'quiz' | 'practice'>('video');
+  const [messages, setMessages] = useState<{role: string, content: string}[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isAiTyping, setIsAiTyping] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [scanPreview, setScanPreview] = useState<string | null>(null);
+  const [videoFinished, setVideoFinished] = useState(false);
+  const [subjectProgress, setSubjectProgress] = useState(0);
+
+  // Content state
+  const [availableContent, setAvailableContent] = useState<any[]>([]);
+  const currentClass = user?.class || 'Class 7';
+  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+
+  const subjectMap: {[key: string]: string} = {
+    'math': 'Magic Maths',
+    'science': 'Science Secrets',
+    'english': 'English Tales',
+    'hindi': 'Hindi Kahaniyan',
+    'music': 'Musical World'
+  };
+
+  useEffect(() => {
+    if (!user) return;
+
+    let allUploaded = JSON.parse(localStorage.getItem('uploaded_content') || '[]');
+    const filtered = allUploaded.filter((c: any) => 
+      c.targetClass === currentClass && c.subject === subjectMap[id as string]
+    );
+
+    let initialVideo = null;
+    if (filtered.length === 0) {
+      const defaultVideo = {
+        id: `def-${id}-${currentClass}`,
+        title: `Welcome to ${subjectMap[id as string]}!`,
+        targetClass: currentClass,
+        subject: subjectMap[id as string],
+        link: 'https://www.youtube.com/watch?v=n0FvK_N2InE',
+        date: new Date().toLocaleDateString()
+      };
+      allUploaded.push(defaultVideo);
+      localStorage.setItem('uploaded_content', JSON.stringify(allUploaded));
+      const defContent = [defaultVideo];
+      setAvailableContent(defContent);
+      initialVideo = defaultVideo;
+    } else {
+      setAvailableContent(filtered);
+      // Auto-resume logic
+      const lastWatchedId = localStorage.getItem(`last_watched_${id}`);
+      initialVideo = filtered.find((v: any) => v.id === lastWatchedId) || filtered[0];
+    }
+    
+    setSelectedVideo(initialVideo);
+    if (initialVideo) localStorage.setItem(`last_watched_${id}`, initialVideo.id);
+
+    const savedProg = localStorage.getItem('progression');
+    if (savedProg) {
+      const parsed = JSON.parse(savedProg);
+      setSubjectProgress(parsed[id as string] || 0);
+    }
+  }, [id, user, currentClass]);
+
+  const handleVideoFinished = () => {
+    if (!selectedVideo) return;
+    setVideoFinished(true);
+    
+    // Track per-video completion
+    const progressData = JSON.parse(localStorage.getItem('user_progress') || '{}');
+    if (!progressData[id as string]) progressData[id as string] = [];
+    if (!progressData[id as string].includes(selectedVideo.id)) {
+      progressData[id as string].push(selectedVideo.id);
+      localStorage.setItem('user_progress', JSON.stringify(progressData));
+      
+      // Calculate new total percentage
+      const totalVideos = availableContent.length;
+      const completedCount = progressData[id as string].length;
+      const newPercentage = Math.round((completedCount / totalVideos) * 100);
+      
+      const overallProg = JSON.parse(localStorage.getItem('progression') || '{}');
+      overallProg[id as string] = newPercentage;
+      localStorage.setItem('progression', JSON.stringify(overallProg));
+      setSubjectProgress(newPercentage);
+    }
+  };
+
+  const handleSelectVideo = (video: any) => {
+    setSelectedVideo(video);
+    setVideoFinished(false);
+    localStorage.setItem(`last_watched_${id}`, video.id);
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || isAiTyping) return;
+    const userMsg = { role: 'user', content: inputValue };
+    setMessages(prev => [...prev, userMsg]);
+    setInputValue('');
+    setIsAiTyping(true);
+    
+    try {
+      const aiResponse = await getGeminiResponse(inputValue, `Student is learning ${id} in ${currentClass}. Currently watching: ${selectedVideo?.title}`);
+      setMessages(prev => [...prev, { role: 'ai', content: aiResponse }]);
+    } finally {
+      setIsAiTyping(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 1. Validation
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Oops! This picture is too big. Please try a smaller one (under 5MB).");
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      alert("Please upload a picture of your work (JPG or PNG)!");
+      return;
+    }
+
+    // 2. Preview & Base64 conversion
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Content = (reader.result as string).split(',')[1];
+      setScanPreview(reader.result as string);
+      setIsAnalyzing(true);
+      setActiveTab('practice');
+
+      try {
+        const result = await analyzeImage(base64Content, "Explain this answer and check if it is correct.");
+        setMessages(prev => [...prev, { role: 'ai', content: `🔍 **Scan Result:**\n${result}` }]);
+      } catch (err) {
+        setMessages(prev => [...prev, { role: 'ai', content: "I had trouble reading that image. Can you try again with a clearer photo?" }]);
+      } finally {
+        setIsAnalyzing(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const getYoutubeEmbed = (url: string) => {
+    if (!url) return '';
+    if (url.includes('embed/')) return url;
+    
+    let videoId = '';
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    
+    if (match && match[2].length === 11) {
+      videoId = match[2];
+    }
+    
+    return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&autohide=1&showinfo=0` : url;
+  };
+
+  const getYoutubeId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : '';
+  };
+
+  return (
+    <div className={styles.container}>
+      <Navbar />
+      
+      <main className={styles.main}>
+        <header className={styles.header}>
+          <div className={styles.titleGroup}>
+            <div className={styles.breadcrumb}>
+              <Link href="/courses">All Courses</Link> <ChevronRight size={14} /> <span>{id}</span>
+            </div>
+            <h1>{subjectMap[id as string]} Adventure! ✨</h1>
+            <p className={styles.subtitle}>Currently learning content for <strong>{currentClass}</strong></p>
+          </div>
+          <div className={styles.headerStats}>
+            <div className={styles.progressBadge}>
+              <Trophy size={18} />
+              <span>{subjectProgress}% Mastery</span>
+            </div>
+          </div>
+        </header>
+
+        <div className={styles.layout}>
+          <div className={styles.contentArea}>
+            <nav className={styles.tabs}>
+              <button className={activeTab === 'video' ? styles.active : ''} onClick={() => setActiveTab('video')}>
+                <Play size={18} /> Video Lessons
+              </button>
+              <button className={activeTab === 'quiz' ? styles.active : ''} onClick={() => setActiveTab('quiz')}>
+                <CheckCircle size={18} /> Chapter Quiz
+              </button>
+              <button className={activeTab === 'practice' ? styles.active : ''} onClick={() => setActiveTab('practice')}>
+                <ScanLine size={18} /> Written Practice
+              </button>
+            </nav>
+
+            <div className={`glass-card ${styles.mediaCard}`}>
+              {activeTab === 'video' ? (
+                <div className={styles.videoPlayerContainer}>
+                  {selectedVideo ? (
+                    <div className={styles.activeVideo}>
+                      <div className={styles.videoWrapper}>
+                        {selectedVideo.link.includes('youtube') || selectedVideo.link.includes('youtu.be') ? (
+                          <CustomYTPlayer 
+                            videoId={getYoutubeId(selectedVideo.link)} 
+                            title={selectedVideo.title}
+                            onComplete={handleVideoFinished}
+                          />
+                        ) : (
+                          <div className={styles.nativePlaceholder}>
+                            <Play size={64} />
+                            <p>Native Video: {selectedVideo.title}</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className={styles.videoInfo}>
+                        <h2>{selectedVideo.title}</h2>
+                        <div className={styles.videoMeta}>
+                          <button onClick={handleVideoFinished} className={styles.finishBtn}>
+                            {videoFinished ? '✅ Finished!' : 'Mark as Finished'}
+                          </button>
+                          <Link href="#" className={styles.pdfBtn}>
+                            <FileText size={18} /> Chapter PDF
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={styles.empty}>
+                      <Video size={48} />
+                      <p>No videos found for this class yet!</p>
+                    </div>
+                  )}
+
+                  {availableContent.length > 1 && (
+                    <div className={styles.playlist}>
+                      <h3>More Videos in this Chapter</h3>
+                      <div className={styles.playlistScroll}>
+                        {availableContent.map((v) => {
+                          const isCompleted = JSON.parse(localStorage.getItem('user_progress') || '{}')[id as string]?.includes(v.id);
+                          return (
+                            <button 
+                              key={v.id} 
+                              className={`${styles.playlistItem} ${selectedVideo?.id === v.id ? styles.currentItem : ''} ${isCompleted ? styles.completed : ''}`}
+                              onClick={() => handleSelectVideo(v)}
+                            >
+                              {isCompleted ? <CheckCircle size={16} color="var(--success)" /> : <Play size={16} />}
+                              <span>{v.title}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : activeTab === 'quiz' ? (
+                <div className={styles.quizArea}>
+                  <h3>Brain Challenge! 🧠</h3>
+                  <div className={styles.lockedState}>
+                    <Trophy size={48} color="var(--accent)" />
+                    <p>Earn questions by watching the video!</p>
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.practiceArea}>
+                  <h3>Teacher AI Checker 📝</h3>
+                  <p>Upload a photo of your written answer and I'll check it for you!</p>
+                  
+                  <div className={styles.scanControls}>
+                    <label className={`${styles.uploadBox} ${isAnalyzing ? styles.loading : ''}`}>
+                      {scanPreview ? (
+                        <div className={styles.previewContainer}>
+                          <img src={scanPreview} alt="Scan Preview" className={styles.previewImg} />
+                          {isAnalyzing && <div className={styles.scanOverlay}><Sparkles className="animate-pulse" /> Analyzing...</div>}
+                        </div>
+                      ) : (
+                        <>
+                          <ScanLine size={48} />
+                          <span>Click to Scan Written Answer</span>
+                        </>
+                      )}
+                      <input type="file" hidden onChange={handleImageUpload} accept="image/*" disabled={isAnalyzing} />
+                    </label>
+                    {scanPreview && !isAnalyzing && (
+                      <button className={styles.resetBtn} onClick={() => setScanPreview(null)}>Scan Another Answer</button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <aside className={`glass-card ${styles.aiSiderbar}`}>
+            <div className={styles.aiHeader}>
+              <Sparkles size={22} color="var(--primary)" />
+              <h3>Teacher Assistant AI</h3>
+            </div>
+            <div className={styles.chatWindow}>
+              {messages.length === 0 ? (
+                <div className={styles.welcomeMsg}>
+                  👋 Hello! I'm your Teacher AI. Ask me anything about this lesson—I love to help!
+                </div>
+              ) : (
+                <>
+                  {messages.map((m, i) => (
+                    <div key={i} className={`${styles.bubble} ${styles[m.role]}`}>
+                      {m.content}
+                    </div>
+                  ))}
+                  {isAiTyping && (
+                    <div className={`${styles.bubble} ${styles.ai} ${styles.typing}`}>
+                      Thinking... ✨
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className={styles.chatInput}>
+              <input 
+                value={inputValue} 
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Type your question..."
+                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+              />
+              <button onClick={handleSendMessage}><Send size={18} /></button>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+  );
+}

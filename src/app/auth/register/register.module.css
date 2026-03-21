@@ -1,0 +1,78 @@
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  padding: 2rem;
+}
+
+.registerCard {
+  width: 100%;
+  max-width: 450px;
+  text-align: center;
+}
+
+.header {
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  font-size: 2rem;
+  margin-top: 1rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  text-align: left;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inputGroup label {
+  font-weight: 600;
+  color: #2d3436;
+  font-size: 0.9rem;
+}
+
+.inputGroup input, .select {
+  padding: 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 1rem;
+  background: white;
+}
+
+.inputGroup input:focus, .select:focus {
+  border-color: var(--secondary);
+  outline: none;
+}
+
+.submitBtn {
+  background: var(--secondary);
+  color: white;
+  padding: 1rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-top: 1rem;
+  box-shadow: 0 6px 20px rgba(78, 205, 196, 0.4);
+}
+
+.switch {
+  margin-top: 2rem;
+  font-size: 0.9rem;
+  color: #636e72;
+}
+
+.switch a {
+  color: var(--secondary);
+  font-weight: 700;
+}
