@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Navbar from '@/components/Navigation/Navbar';
 import { Upload, Plus, BarChart, Video, BrainCircuit } from 'lucide-react';
 import { useAuth } from '@/components/Auth/AuthContext';
+import { CLASS_SUBJECTS, SUBJECT_METADATA } from '@/lib/constants';
 import styles from './admin.module.css';
 
 export default function AdminPage() {
@@ -11,7 +12,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'content' | 'analytics'>('content');
   const [videoTitle, setVideoTitle] = useState('');
   const [targetClass, setTargetClass] = useState('Class 7');
-  const [subject, setSubject] = useState('Magic Maths');
+  const [subject, setSubject] = useState('Mathematics');
   const [videoLink, setVideoLink] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -114,11 +115,9 @@ export default function AdminPage() {
                       onChange={(e) => setSubject(e.target.value)}
                       required
                     >
-                      <option>Magic Maths</option>
-                      <option>Science Secrets</option>
-                      <option>English Tales</option>
-                      <option>Hindi Kahaniyan</option>
-                      <option>Musical World</option>
+                      {(CLASS_SUBJECTS[targetClass] || CLASS_SUBJECTS['Class 7']).map(subjName => (
+                        <option key={subjName}>{subjName}</option>
+                      ))}
                     </select>
                   </div>
                 </div>

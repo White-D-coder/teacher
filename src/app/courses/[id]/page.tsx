@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getGeminiResponse, analyzeImage } from '@/lib/gemini';
 import CustomYTPlayer from '@/components/Video/CustomYTPlayer';
+import { getSubjectById } from '@/lib/constants';
 import styles from './subject.module.css';
 
 export default function SubjectPage() {
@@ -39,29 +40,23 @@ export default function SubjectPage() {
   const currentClass = user?.class || 'Class 7';
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
 
-  const subjectMap: {[key: string]: string} = {
-    'math': 'Magic Maths',
-    'science': 'Science Secrets',
-    'english': 'English Tales',
-    'hindi': 'Hindi Kahaniyan',
-    'music': 'Musical World'
-  };
+  const subjectName = getSubjectById(id as string)?.name || 'Subject';
 
   useEffect(() => {
     if (!user) return;
 
     let allUploaded = JSON.parse(localStorage.getItem('uploaded_content') || '[]');
     const filtered = allUploaded.filter((c: any) => 
-      c.targetClass === currentClass && c.subject === subjectMap[id as string]
+      c.targetClass === currentClass && c.subject === subjectName
     );
 
     let initialVideo = null;
     if (filtered.length === 0) {
       const defaultVideo = {
         id: `def-${id}-${currentClass}`,
-        title: `Welcome to ${subjectMap[id as string]}!`,
+        title: `Welcome to ${subjectName}!`,
         targetClass: currentClass,
-        subject: subjectMap[id as string],
+        subject: subjectName,
         link: 'https://www.youtube.com/watch?v=n0FvK_N2InE',
         date: new Date().toLocaleDateString()
       };
@@ -196,7 +191,7 @@ export default function SubjectPage() {
             <div className={styles.breadcrumb}>
               <Link href="/courses">All Courses</Link> <ChevronRight size={14} /> <span>{id}</span>
             </div>
-            <h1>{subjectMap[id as string]} Adventure! ✨</h1>
+            <h1>{subjectName} Adventure! ✨</h1>
             <p className={styles.subtitle}>Currently learning content for <strong>{currentClass}</strong></p>
           </div>
           <div className={styles.headerStats}>
