@@ -10,17 +10,34 @@ import styles from './login.module.css';
 export default function LoginPage() {
   const [role, setRole] = useState<'student' | 'admin'>('student');
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    login({
-      name: name || (role === 'admin' ? 'Super Admin' : 'Little Scholar'),
-      class: 'Class 7', // Default or fetch from last session
-      role: role
-    });
-    router.push(role === 'admin' ? '/admin' : '/courses');
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, secretCode: password })
+      });
+
+      if (!res.ok) throw new Error('Invalid name or secret code!');
+
+      const user = await res.json();
+      login(user);
+      router.push(user.role === 'admin' ? '/admin' : '/courses');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -48,6 +65,7 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className={styles.form}>
+          {error && <p className={styles.error}>{error}</p>}
           <div className={styles.inputGroup}>
             <label>Name or Email</label>
             <input 
@@ -60,10 +78,16 @@ export default function LoginPage() {
           </div>
           <div className={styles.inputGroup}>
             <label>Secret Code (Password)</label>
-            <input type="password" placeholder="••••••••" required />
+            <input 
+              type="password" 
+              placeholder="••••••••" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required 
+            />
           </div>
-          <button type="submit" className={styles.submitBtn}>
-            Let's Go! 🚀
+          <button type="submit" className={styles.submitBtn} disabled={isLoading}>
+            {isLoading ? 'Wait a sec... ✨' : "Let's Go! 🚀"}
           </button>
         </form>
 
