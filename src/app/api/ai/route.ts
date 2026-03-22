@@ -37,14 +37,26 @@ export async function POST(request: Request) {
       result = await model.generateContent(fullPrompt);
     }
 
-    const responseText = result.response.text();
+    const response = await result.response;
+    const responseText = response.text();
+    
+    if (!responseText) {
+      throw new Error("Empty response from Gemini");
+    }
+
     return NextResponse.json({ text: responseText });
 
   } catch (error: any) {
-    console.error("AI Route Error:", error);
+    console.error("❌ Gemini API Proxy Error:", error);
+    
+    // Check for specific common errors
+    if (error.message?.includes("API key")) {
+      return NextResponse.json({ error: "Invalid API Key", message: "Check your .env file" }, { status: 401 });
+    }
+
     return NextResponse.json({ 
       error: "AI Service Error", 
-      message: error.message 
+      message: error.message || "Internal Server Error"
     }, { status: 500 });
   }
 }
