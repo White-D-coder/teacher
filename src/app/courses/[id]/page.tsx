@@ -264,7 +264,8 @@ export default function SubjectPage() {
                           title: v.title,
                           isCompleted: v.progress?.[0]?.isCompleted || false,
                           isUnlocked: index === 0 || (availableContent[index - 1]?.progress?.[0]?.isCompleted === true),
-                          order: index + 1
+                          order: index + 1,
+                          supplements: v.supplements || []
                         }))}
                         onChapterClick={handleSelectChapter}
                         activeChapterId={selectedChapter?.id}
@@ -318,26 +319,6 @@ export default function SubjectPage() {
                     <div className={styles.empty}>
                       <Video size={48} />
                       <p>No videos found for this class yet!</p>
-                    </div>
-                  )}
-
-                  {availableContent.length > 0 && (
-                    <div className={styles.roadmapSidebar}>
-                      <div className={styles.roadmapHeader}>
-                        <h3>Lesson Roadmap 🗺️</h3>
-                        <p>Complete lessons to unlock the next level!</p>
-                      </div>
-                      <Roadmap 
-                        chapters={availableContent.map((v, index) => ({
-                          id: v.id,
-                          title: v.title,
-                          isCompleted: v.progress?.[0]?.isCompleted || false,
-                          isUnlocked: index === 0 || (availableContent[index - 1]?.progress?.[0]?.isCompleted === true),
-                          order: index + 1
-                        }))}
-                        onChapterClick={handleSelectChapter}
-                        activeChapterId={selectedChapter?.id}
-                      />
                     </div>
                   )}
                 </div>
