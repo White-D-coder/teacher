@@ -12,16 +12,38 @@ export default function RegisterPage() {
   const { login } = useAuth();
   const [name, setName] = useState('');
   const [selectedClass, setSelectedClass] = useState('Class 7');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    const role = name.toLowerCase().includes('teacher') ? 'admin' : 'student';
-    login({
-      name: name || 'New Hero',
-      class: selectedClass,
-      role: role as 'student' | 'admin'
-    });
-    router.push(role === 'admin' ? '/admin' : '/courses');
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const role = name.toLowerCase().includes('teacher') ? 'admin' : 'student';
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: name || 'New Hero', 
+          class: selectedClass, 
+          secretCode: password,
+          role 
+        })
+      });
+
+      if (!res.ok) throw new Error('Registration failed. Try again!');
+
+      const user = await res.json();
+      login(user);
+      router.push(user.role === 'admin' ? '/admin' : '/courses');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -61,10 +83,17 @@ export default function RegisterPage() {
           </div>
           <div className={styles.inputGroup}>
             <label>Secret Code</label>
-            <input type="password" placeholder="Create a secret code..." required />
+            <input 
+              type="password" 
+              placeholder="Create a secret code..." 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required 
+            />
           </div>
-          <button type="submit" className={styles.submitBtn}>
-            Let's Start! ✨
+          {error && <p className={styles.error}>{error}</p>}
+          <button type="submit" className={styles.submitBtn} disabled={isLoading}>
+            {isLoading ? 'Creating Hero... ✨' : "Let's Start! ✨"}
           </button>
         </form>
 

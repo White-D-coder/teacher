@@ -28,29 +28,42 @@ export default function AdminPage() {
     );
   }
 
-  const handleUpload = (e: React.FormEvent) => {
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!videoTitle || !videoLink) return;
 
     const newContent = {
-      id: Date.now().toString(),
       title: videoTitle.trim(),
       targetClass,
       subject,
       link: videoLink.trim(),
-      date: new Date().toLocaleDateString()
+      date: new Date().toLocaleDateString(),
+      order: Date.now() // Simple ordering for now
     };
     
     try {
+      // 1. Save to Database via API
+      const res = await fetch('/api/lessons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newContent)
+      });
+
+      if (!res.ok) throw new Error('Failed to upload to database');
+
+      const savedLesson = await res.json();
+      
+      // 2. Local fallback for instant UI update
       const existing = JSON.parse(localStorage.getItem('uploaded_content') || '[]');
-      localStorage.setItem('uploaded_content', JSON.stringify([...existing, newContent]));
+      localStorage.setItem('uploaded_content', JSON.stringify([...existing, savedLesson]));
       
       setShowSuccess(true);
       setVideoTitle('');
       setVideoLink('');
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err) {
-      alert("Failed to save content. Your browser's storage might be full!");
+      console.error("Upload error:", err);
+      alert("Failed to save content. Please check your connection.");
     }
   };
 
