@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navigation/Navbar';
 import Link from 'next/link';
 import { useAuth } from '@/components/Auth/AuthContext';
@@ -28,7 +28,9 @@ import styles from './subject.module.css';
 export default function SubjectPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
+  const chapterIdFromUrl = searchParams.get('chapter');
   const [activeTab, setActiveTab] = useState<'index' | 'video' | 'quiz' | 'practice'>('index');
   const [messages, setMessages] = useState<{role: string, content: string}[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -63,10 +65,18 @@ export default function SubjectPage() {
         
         // Auto-resume logic
         let initialChapter = chapters?.[0] || null;
-        for (const ch of chapters) {
-          if (!ch.progress?.[0]?.isCompleted) {
-            initialChapter = ch;
-            break;
+        if (chapterIdFromUrl) {
+          const matched = chapters.find((c: any) => c.id === chapterIdFromUrl);
+          if (matched) {
+            initialChapter = matched;
+            setActiveTab('video');
+          }
+        } else {
+          for (const ch of chapters) {
+            if (!ch.progress?.[0]?.isCompleted) {
+              initialChapter = ch;
+              break;
+            }
           }
         }
 
