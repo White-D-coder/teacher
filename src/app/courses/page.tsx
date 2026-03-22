@@ -11,9 +11,16 @@ import styles from './courses.module.css';
 
 export default function CoursesPage() {
   const { user, updateClass } = useAuth();
-  const selectedClass = user?.class || 'Class 7';
+  const [selectedClass, setSelectedClass] = useState('Class 7');
+
+  useEffect(() => {
+    if (user?.class) {
+      setSelectedClass(user.class);
+    }
+  }, [user]);
 
   const handleClassChange = (newClass: string) => {
+    setSelectedClass(newClass);
     updateClass(newClass);
   };
 

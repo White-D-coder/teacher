@@ -155,6 +155,72 @@ export default function SubjectPage() {
     setActiveTab('video');
   };
 
+  // Helper for comprehensive markdown rendering
+  const renderMarkdown = (text: string | null) => {
+    if (!text) return null;
+    const lines = text.split("\n");
+    const elements: React.ReactNode[] = [];
+    
+    // Helper to process bold, italic and highlights in a line
+    const processInlines = (str: string) => {
+      // Bold (**text**), Italic (*text*)
+      return str.split(/(\*\*.*?\*\*|\*.*?\*)/).map((part, i) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return <strong key={i} style={{ color: "var(--primary)", fontWeight: "bold" }}>{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
+          return <em key={i} style={{ fontStyle: "italic" }}>{part.slice(1, -1)}</em>;
+        }
+        return part;
+      });
+    };
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      
+      // Horizontal Rules
+      if (trimmed === "---") {
+        elements.push(<hr key={idx} style={{ border: "0", borderTop: "1px solid rgba(0,0,0,0.1)", margin: "1.5rem 0" }} />);
+        return;
+      }
+
+      // Headings
+      if (trimmed.startsWith("###")) {
+        const hText = trimmed.replace(/^###\s*/, "");
+        elements.push(<h3 key={idx} style={{ color: "var(--primary)", marginTop: "1.2rem", marginBottom: "0.5rem", fontSize: "1.15rem" }}>{processInlines(hText)}</h3>);
+        return;
+      }
+      if (trimmed.startsWith("####")) {
+        const hText = trimmed.replace(/^####\s*/, "");
+        elements.push(<h4 key={idx} style={{ color: "var(--accent)", marginTop: "1rem", marginBottom: "0.4rem", fontSize: "1rem" }}>{processInlines(hText)}</h4>);
+        return;
+      }
+
+      // Bullet points
+      if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
+        const bText = trimmed.substring(2);
+        elements.push(
+          <div key={idx} style={{ display: "flex", gap: "8px", marginLeft: "1.2rem", marginBottom: "4px" }}>
+            <span style={{ color: "var(--primary)" }}>•</span>
+            <div style={{ flex: 1 }}>{processInlines(bText)}</div>
+          </div>
+        );
+        return;
+      }
+
+      // Empty Lines (Para Breaks)
+      if (trimmed === "") {
+        elements.push(<div key={idx} style={{ height: "0.8rem" }} />);
+        return;
+      }
+
+      // Standard Text
+      elements.push(<div key={idx} style={{ marginBottom: "4px", lineHeight: "1.6" }}>{processInlines(line)}</div>);
+    });
+
+    return elements;
+  };
+
   const handleGenerateNotes = async () => {
     if (!selectedChapter || isGeneratingNotes) return;
     setIsGeneratingNotes(true);
@@ -172,6 +238,7 @@ export default function SubjectPage() {
       setIsGeneratingNotes(false);
     }
   };
+
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isAiTyping) return;
@@ -403,7 +470,7 @@ export default function SubjectPage() {
                             Fun Chapter Notes & Summary
                           </h3>
                           <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem', color: '#444', lineHeight: '1.6' }}>
-                            {chapterNotes}
+                            {renderMarkdown(chapterNotes)}
                           </div>
                           <button 
                             onClick={() => window.print()}
@@ -476,7 +543,7 @@ export default function SubjectPage() {
                 <>
                   {messages.map((m, i) => (
                     <div key={i} className={`${styles.bubble} ${styles[m.role]}`}>
-                      {m.content}
+                      {m.role === 'ai' ? renderMarkdown(m.content) : m.content}
                     </div>
                   ))}
                   {isAiTyping && (
