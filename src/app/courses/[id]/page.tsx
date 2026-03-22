@@ -44,6 +44,8 @@ export default function SubjectPage() {
   const currentClass = user?.class || 'Class 7';
   const [selectedChapter, setSelectedChapter] = useState<any>(null);
   const [selectedLesson, setSelectedLesson] = useState<any>(null);
+  const [chapterNotes, setChapterNotes] = useState<string | null>(null);
+  const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
 
   const subjectName = getSubjectById(id as string)?.name || 'Subject';
   const subjectKey = getSubjectKeyById(id as string);
@@ -151,6 +153,24 @@ export default function SubjectPage() {
     setSelectedLesson(lesson);
     setVideoFinished(lesson?.progress?.[0]?.videoCompleted || false);
     setActiveTab('video');
+  };
+
+  const handleGenerateNotes = async () => {
+    if (!selectedChapter || isGeneratingNotes) return;
+    setIsGeneratingNotes(true);
+    setChapterNotes(null);
+    
+    try {
+      const prompt = `Generate friendly, fun, and detailed chapter notes and a 2-paragraph summary for a child (Class ${currentClass}) about the chapter: "${selectedChapter.title}". 
+      Use emojis, bullet points, and simple language. Keep it very encouraging!`;
+      
+      const response = await getGeminiResponse(prompt, `Subject: ${subjectName}. This is for an 8-12 year old student.`);
+      setChapterNotes(response);
+    } catch (err) {
+      setChapterNotes("I couldn't generate the notes right now. Try again in a bit! 🤖");
+    } finally {
+      setIsGeneratingNotes(false);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -343,6 +363,26 @@ export default function SubjectPage() {
                           <button onClick={() => handleComponentFinished('video')} className={styles.finishBtn}>
                             {videoFinished ? '✅ Finished!' : 'Mark as Finished'}
                           </button>
+
+                          <button 
+                            onClick={handleGenerateNotes} 
+                            disabled={isGeneratingNotes}
+                            className={styles.advanceBtn}
+                            style={{
+                              background: 'var(--accent)',
+                              color: 'var(--foreground)',
+                              padding: '0.8rem 1.5rem',
+                              borderRadius: 'var(--radius)',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              opacity: isGeneratingNotes ? 0.7 : 1
+                            }}
+                          >
+                            <Sparkles size={18} />
+                            {isGeneratingNotes ? 'Generating...' : 'Advance (AI Notes) 🚀'}
+                          </button>
                           
                           {selectedChapter.supplements && selectedChapter.supplements.length > 0 && (
                             <div className={styles.supplementsList} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -355,6 +395,25 @@ export default function SubjectPage() {
                           )}
                         </div>
                       </div>
+
+                      {chapterNotes && (
+                        <div className={styles.notesSection} style={{ padding: '2rem', borderTop: '1px solid var(--border)', background: 'rgba(255, 230, 109, 0.05)' }}>
+                          <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Star size={20} color="var(--accent)" fill="var(--accent)" /> 
+                            Fun Chapter Notes & Summary
+                          </h3>
+                          <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem', color: '#444', lineHeight: '1.6' }}>
+                            {chapterNotes}
+                          </div>
+                          <button 
+                            onClick={() => window.print()}
+                            className={styles.pdfBtn}
+                            style={{ marginTop: '1.5rem', background: '#333' }}
+                          >
+                            <FileText size={18} /> Print as PDF (Beta)
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className={styles.empty}>
