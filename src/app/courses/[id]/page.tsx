@@ -38,10 +38,10 @@ export default function SubjectPage() {
   const [videoFinished, setVideoFinished] = useState(false);
   const [subjectProgress, setSubjectProgress] = useState(0);
 
-  // Content state
   const [availableContent, setAvailableContent] = useState<any[]>([]);
   const currentClass = user?.class || 'Class 7';
   const [selectedChapter, setSelectedChapter] = useState<any>(null);
+  const [selectedLesson, setSelectedLesson] = useState<any>(null);
 
   const subjectName = getSubjectById(id as string)?.name || 'Subject';
   const subjectKey = getSubjectKeyById(id as string);
@@ -71,6 +71,7 @@ export default function SubjectPage() {
         }
 
         setSelectedChapter(initialChapter);
+        setSelectedLesson(initialChapter?.lessons?.[0] || null);
 
         // Fetch subject progress percentage
         let totalMastery = 0;
@@ -93,7 +94,7 @@ export default function SubjectPage() {
     try {
       const payload: any = {
         userId: user.id || user.name,
-        lessonId: selectedChapter.lessons[0].id
+        lessonId: selectedLesson?.id
       };
       
       if (type === 'video') payload.videoCompleted = true;
@@ -136,7 +137,9 @@ export default function SubjectPage() {
 
   const handleSelectChapter = (chapter: any) => {
     setSelectedChapter(chapter);
-    setVideoFinished(chapter.lessons?.[0]?.progress?.[0]?.videoCompleted || false);
+    const lesson = chapter.lessons?.[0] || null;
+    setSelectedLesson(lesson);
+    setVideoFinished(lesson?.progress?.[0]?.videoCompleted || false);
     setActiveTab('video');
   };
 
@@ -283,10 +286,10 @@ export default function SubjectPage() {
                   {selectedChapter ? (
                     <div className={styles.activeVideo}>
                       <div className={styles.videoWrapper}>
-                        {selectedChapter.lessons?.[0] ? (
+                        {selectedLesson ? (
                           <CustomYTPlayer 
-                            videoId={getYoutubeId(selectedChapter.lessons[0].videoUrl)} 
-                            title={selectedChapter.lessons[0].title}
+                            videoId={getYoutubeId(selectedLesson.videoUrl)} 
+                            title={selectedLesson.title}
                             onComplete={() => handleComponentFinished('video')}
                           />
                         ) : (
@@ -297,7 +300,35 @@ export default function SubjectPage() {
                         )}
                       </div>
                       <div className={styles.videoInfo}>
-                        <h2>{selectedChapter.title}</h2>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                          <h2>{selectedChapter.title}</h2>
+                          {selectedChapter.lessons?.length > 1 && (
+                            <div className={styles.lessonSelector} style={{ display: 'flex', gap: '8px' }}>
+                              {selectedChapter.lessons.map((lesson: any, idx: number) => (
+                                <button 
+                                  key={lesson.id}
+                                  onClick={() => {
+                                    setSelectedLesson(lesson);
+                                    setVideoFinished(lesson.progress?.[0]?.videoCompleted || false);
+                                  }}
+                                  className={selectedLesson?.id === lesson.id ? styles.activeLessonBtn : styles.lessonBtn}
+                                  style={{
+                                    padding: '6px 15px',
+                                    borderRadius: '20px',
+                                    fontSize: '13px',
+                                    cursor: 'pointer',
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    transition: 'all 0.3s ease',
+                                    backgroundColor: selectedLesson?.id === lesson.id ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                                    color: 'white'
+                                  }}
+                                >
+                                  {lesson.title.toLowerCase().includes('intro') ? 'Intro 🎬' : (lesson.title.toLowerCase().includes('main') ? 'Main 🚀' : `Video ${idx + 1}`)}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <div className={styles.videoMeta}>
                           <button onClick={() => handleComponentFinished('video')} className={styles.finishBtn}>
                             {videoFinished ? '✅ Finished!' : 'Mark as Finished'}
