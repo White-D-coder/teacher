@@ -90,11 +90,12 @@
 
 .videoPlayerContainer {
   display: flex;
-  flex-direction: column;
+  gap: 20px;
+  min-height: 500px;
 }
 
 .activeVideo {
-  width: 100%;
+  flex: 1;
 }
 
 .videoWrapper {
@@ -223,24 +224,26 @@
   gap: 1rem;
   overflow-y: auto;
   padding-right: 0.5rem;
-  min-height: 400px;
+  min-height: 350px;
+  max-height: 50vh;
 }
 
 .welcomeMsg {
   background: #f7f9fc;
-  padding: 1.5rem;
+  padding: 1rem;
   border-radius: var(--radius);
   color: #636e72;
+  font-size: 0.9rem;
   font-weight: 500;
   border: 1px dashed var(--border);
 }
 
 .bubble {
-  max-width: 85%;
-  padding: 1rem;
-  border-radius: 18px;
-  font-size: 0.95rem;
-  line-height: 1.5;
+  max-width: 90%;
+  padding: 0.8rem 1.2rem;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  line-height: 1.4;
   position: relative;
 }
 
@@ -385,7 +388,74 @@
   color: white;
 }
 
+.roadmapSidebar {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  background: #fdfdfd;
+  border-left: 1px solid var(--border);
+  padding: 1rem;
+}
+
+.roadmapHeader {
+  margin-bottom: 0px;
+}
+
+.roadmapHeader h3 {
+  font-size: 1.1rem;
+  color: var(--foreground);
+  margin-bottom: 4px;
+}
+
+.roadmapHeader p {
+  font-size: 0.85rem;
+  color: #636e72;
+}
+
+.indexArea {
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.fullRoadmapWrapper {
+  width: 100%;
+  max-width: 600px;
+  height: clamp(350px, 60vh, 600px);
+  margin: 0 auto;
+  padding: 1rem;
+  background: #fdfdfd;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem;
+  color: #b2bec3;
+}
+
+.empty svg {
+  opacity: 0.5;
+}
+
 @media (max-width: 1024px) {
   .layout { grid-template-columns: 1fr; }
   .aiSiderbar { min-height: 500px; }
+  .videoPlayerContainer {
+    flex-direction: column;
+  }
+  .roadmapSidebar {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    min-height: 400px;
+  }
 }

@@ -37,12 +37,11 @@ export default function SubjectPage() {
   const [scanPreview, setScanPreview] = useState<string | null>(null);
   const [videoFinished, setVideoFinished] = useState(false);
   const [subjectProgress, setSubjectProgress] = useState(0);
-  const [completedLessons, setCompletedLessons] = useState<string[]>([]);
 
   // Content state
   const [availableContent, setAvailableContent] = useState<any[]>([]);
   const currentClass = user?.class || 'Class 7';
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+  const [selectedChapter, setSelectedChapter] = useState<any>(null);
 
   const subjectName = getSubjectById(id as string)?.name || 'Subject';
   const subjectKey = getSubjectKeyById(id as string);
@@ -55,41 +54,29 @@ export default function SubjectPage() {
         const res = await fetch(`/api/lessons?subject=${encodeURIComponent(subjectKey)}&class=${encodeURIComponent(currentClass)}`);
         const data = await res.json();
         
-        let lessons = data;
-        if (!lessons || lessons.length === 0) {
-          // Fallback to local storage or default
-          let allUploaded = JSON.parse(localStorage.getItem('uploaded_content') || '[]');
-          lessons = allUploaded.filter((c: any) => 
-            c.targetClass === currentClass && c.subject === subjectKey
-          );
-          
-          if (lessons.length === 0) {
-            const defaultVideo = {
-              id: `def-${id}-${currentClass}`,
-              title: `Welcome to ${subjectName}!`,
-              targetClass: currentClass,
-              subject: subjectKey,
-              link: 'https://www.youtube.com/watch?v=n0FvK_N2InE',
-              date: new Date().toLocaleDateString()
-            };
-            lessons = [defaultVideo];
-          }
+        let chapters = data;
+        if (!chapters || chapters.length === 0) {
+          chapters = [];
         }
         
-        setAvailableContent(lessons);
+        setAvailableContent(chapters);
         
         // Auto-resume logic
-        const lastWatchedId = localStorage.getItem(`last_watched_${id}`);
-        const initialVideo = lessons.find((v: any) => v.id === lastWatchedId) || lessons[0];
-        setSelectedVideo(initialVideo);
-        if (initialVideo) localStorage.setItem(`last_watched_${id}`, initialVideo.id);
+        let initialChapter = chapters?.[0] || null;
+        for (const ch of chapters) {
+          if (!ch.progress?.[0]?.isCompleted) {
+            initialChapter = ch;
+            break;
+          }
+        }
+
+        setSelectedChapter(initialChapter);
 
         // Fetch subject progress percentage
-        const savedProg = JSON.parse(localStorage.getItem('progression') || '{}');
-        setSubjectProgress(savedProg[id as string] || 0);
+        let totalMastery = 0;
+        chapters.forEach((ch: any) => totalMastery += (ch.progress?.[0]?.mastery || 0));
+        setSubjectProgress(chapters.length > 0 ? Math.round(totalMastery / chapters.length) : 0);
 
-        const progressData = JSON.parse(localStorage.getItem('user_progress') || '{}');
-        setCompletedLessons(progressData[id as string] || []);
       } catch (err) {
         console.error('Failed to fetch content:', err);
       }
@@ -98,49 +85,58 @@ export default function SubjectPage() {
     fetchContent();
   }, [id, user, currentClass, subjectName]);
 
-  const handleVideoFinished = async () => {
-    if (!selectedVideo || !user) return;
-    setVideoFinished(true);
+  const handleComponentFinished = async (type: 'video' | 'quiz' | 'written') => {
+    if (!selectedChapter || !selectedChapter.lessons?.[0] || !user) return;
     
+    if (type === 'video') setVideoFinished(true);
+
     try {
-      // Sync to API
-      await fetch('/api/progress', {
+      const payload: any = {
+        userId: user.id || user.name,
+        lessonId: selectedChapter.lessons[0].id
+      };
+      
+      if (type === 'video') payload.videoCompleted = true;
+      if (type === 'quiz') payload.quizCompleted = true;
+      if (type === 'written') payload.writtenCompleted = true;
+
+      const res = await fetch('/api/progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id || user.name, // Fallback for mock/old users
-          lessonId: selectedVideo.id,
-          watchedPercentage: 100,
-          completed: true
-        })
+        body: JSON.stringify(payload)
       });
-
-      // Local tracking for instant UI update
-      const progressData = JSON.parse(localStorage.getItem('user_progress') || '{}');
-      if (!progressData[id as string]) progressData[id as string] = [];
-      if (!progressData[id as string].includes(selectedVideo.id)) {
-        progressData[id as string].push(selectedVideo.id);
-        localStorage.setItem('user_progress', JSON.stringify(progressData));
-        setCompletedLessons([...progressData[id as string]]);
+      
+      const newProgress = await res.json();
+      
+      // Mutate state gracefully
+      const updatedChapters = [...availableContent];
+      const chIndex = updatedChapters.findIndex(c => c.id === selectedChapter.id);
+      if (chIndex > -1) {
+        if (!updatedChapters[chIndex].progress) updatedChapters[chIndex].progress = [];
+        if (!updatedChapters[chIndex].progress[0]) updatedChapters[chIndex].progress[0] = { mastery: 0, isCompleted: false };
         
-        const totalVideos = availableContent.length;
-        const completedCount = progressData[id as string].length;
-        const newPercentage = Math.round((completedCount / totalVideos) * 100);
-        
-        const overallProg = JSON.parse(localStorage.getItem('progression') || '{}');
-        overallProg[id as string] = newPercentage;
-        localStorage.setItem('progression', JSON.stringify(overallProg));
-        setSubjectProgress(newPercentage);
+        // We do a soft refetch of the dashboard metrics ideally, but approximating locally:
+        // Or better yet, we can reload content from API silently
+        fetchContentSilently();
       }
     } catch (err) {
       console.error('Progress sync error:', err);
     }
   };
 
-  const handleSelectVideo = (video: any) => {
-    setSelectedVideo(video);
-    setVideoFinished(false);
-    localStorage.setItem(`last_watched_${id}`, video.id);
+  const fetchContentSilently = async () => {
+    const res = await fetch(`/api/lessons?subject=${encodeURIComponent(subjectKey)}&class=${encodeURIComponent(currentClass)}`);
+    const chapters = await res.json();
+    setAvailableContent(chapters);
+    let totalMastery = 0;
+    chapters.forEach((ch: any) => totalMastery += (ch.progress?.[0]?.mastery || 0));
+    setSubjectProgress(chapters.length > 0 ? Math.round(totalMastery / chapters.length) : 0);
+  };
+
+
+  const handleSelectChapter = (chapter: any) => {
+    setSelectedChapter(chapter);
+    setVideoFinished(chapter.lessons?.[0]?.progress?.[0]?.videoCompleted || false);
     setActiveTab('video');
   };
 
@@ -152,7 +148,7 @@ export default function SubjectPage() {
     setIsAiTyping(true);
     
     try {
-      const aiResponse = await getGeminiResponse(inputValue, `Student is learning ${id} in ${currentClass}. Currently watching: ${selectedVideo?.title}`);
+      const aiResponse = await getGeminiResponse(inputValue, `Student is learning ${id} in ${currentClass}. Currently watching: ${selectedChapter?.title}`);
       setMessages(prev => [...prev, { role: 'ai', content: aiResponse }]);
     } finally {
       setIsAiTyping(false);
@@ -184,6 +180,7 @@ export default function SubjectPage() {
       try {
         const result = await analyzeImage(base64Content, "Explain this answer and check if it is correct.");
         setMessages(prev => [...prev, { role: 'ai', content: `🔍 **Scan Result:**\n${result}` }]);
+        handleComponentFinished('written');
       } catch (err) {
         setMessages(prev => [...prev, { role: 'ai', content: "I had trouble reading that image. Can you try again with a clearer photo?" }]);
       } finally {
@@ -265,12 +262,12 @@ export default function SubjectPage() {
                         chapters={availableContent.map((v, index) => ({
                           id: v.id,
                           title: v.title,
-                          isCompleted: completedLessons.includes(v.id),
-                          isUnlocked: index === 0 || completedLessons.includes(availableContent[index - 1].id),
+                          isCompleted: v.progress?.[0]?.isCompleted || false,
+                          isUnlocked: index === 0 || (availableContent[index - 1]?.progress?.[0]?.isCompleted === true),
                           order: index + 1
                         }))}
-                        onChapterClick={handleSelectVideo}
-                        activeChapterId={selectedVideo?.id}
+                        onChapterClick={handleSelectChapter}
+                        activeChapterId={selectedChapter?.id}
                       />
                     </div>
                   ) : (
@@ -282,31 +279,38 @@ export default function SubjectPage() {
                 </div>
               ) : activeTab === 'video' ? (
                 <div className={styles.videoPlayerContainer}>
-                  {selectedVideo ? (
+                  {selectedChapter ? (
                     <div className={styles.activeVideo}>
                       <div className={styles.videoWrapper}>
-                        {selectedVideo.link.includes('youtube') || selectedVideo.link.includes('youtu.be') ? (
+                        {selectedChapter.lessons?.[0] ? (
                           <CustomYTPlayer 
-                            videoId={getYoutubeId(selectedVideo.link)} 
-                            title={selectedVideo.title}
-                            onComplete={handleVideoFinished}
+                            videoId={getYoutubeId(selectedChapter.lessons[0].videoUrl)} 
+                            title={selectedChapter.lessons[0].title}
+                            onComplete={() => handleComponentFinished('video')}
                           />
                         ) : (
                           <div className={styles.nativePlaceholder}>
                             <Play size={64} />
-                            <p>Native Video: {selectedVideo.title}</p>
+                            <p>No video attached to this chapter.</p>
                           </div>
                         )}
                       </div>
                       <div className={styles.videoInfo}>
-                        <h2>{selectedVideo.title}</h2>
+                        <h2>{selectedChapter.title}</h2>
                         <div className={styles.videoMeta}>
-                          <button onClick={handleVideoFinished} className={styles.finishBtn}>
+                          <button onClick={() => handleComponentFinished('video')} className={styles.finishBtn}>
                             {videoFinished ? '✅ Finished!' : 'Mark as Finished'}
                           </button>
-                          <Link href="#" className={styles.pdfBtn}>
-                            <FileText size={18} /> Chapter PDF
-                          </Link>
+                          
+                          {selectedChapter.supplements && selectedChapter.supplements.length > 0 && (
+                            <div className={styles.supplementsList} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              {selectedChapter.supplements.map((supp: any) => (
+                                <Link key={supp.id} href={supp.link} className={styles.pdfBtn} target="_blank">
+                                  <FileText size={18} /> {supp.title}
+                                </Link>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -327,12 +331,12 @@ export default function SubjectPage() {
                         chapters={availableContent.map((v, index) => ({
                           id: v.id,
                           title: v.title,
-                          isCompleted: completedLessons.includes(v.id),
-                          isUnlocked: index === 0 || completedLessons.includes(availableContent[index - 1].id),
+                          isCompleted: v.progress?.[0]?.isCompleted || false,
+                          isUnlocked: index === 0 || (availableContent[index - 1]?.progress?.[0]?.isCompleted === true),
                           order: index + 1
                         }))}
-                        onChapterClick={handleSelectVideo}
-                        activeChapterId={selectedVideo?.id}
+                        onChapterClick={handleSelectChapter}
+                        activeChapterId={selectedChapter?.id}
                       />
                     </div>
                   )}
@@ -340,9 +344,12 @@ export default function SubjectPage() {
               ) : activeTab === 'quiz' ? (
                 <div className={styles.quizArea}>
                   <h3>Brain Challenge! 🧠</h3>
-                  <div className={styles.lockedState}>
+                  <div className={styles.lockedState} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <Trophy size={48} color="var(--accent)" />
                     <p>Earn questions by watching the video!</p>
+                    <button onClick={() => handleComponentFinished('quiz')} className={styles.finishBtn} style={{ marginTop: '20px' }}>
+                      Mark Quiz Completed (Debug)
+                    </button>
                   </div>
                 </div>
               ) : (
