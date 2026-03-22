@@ -143,3 +143,57 @@
   opacity: 1;
   transform: translateX(5px);
 }
+
+.selectionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-top: 40px;
+}
+
+.selectionCard {
+  text-align: center;
+  padding: 40px 30px;
+  cursor: pointer;
+  background: white;
+  border: 1px solid var(--border);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.selectionCard:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  border-color: var(--primary);
+}
+
+.partIcon {
+  font-size: 4rem;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 5px 15px rgba(0,0,0,0.1));
+}
+
+.selectionCard h3 {
+  font-size: 1.5rem;
+  margin-bottom: 5px;
+}
+
+.selectionCard p {
+  color: #636e72;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.activeBranch {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .selectionGrid {
+    grid-template-columns: 1fr;
+  }
+}

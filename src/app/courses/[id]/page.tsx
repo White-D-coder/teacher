@@ -50,12 +50,16 @@ export default function SubjectPage() {
   const subjectName = getSubjectById(id as string)?.name || 'Subject';
   const subjectKey = getSubjectKeyById(id as string);
 
+  const part = searchParams.get('part');
+  const isSocial = id === 'social';
+
   useEffect(() => {
     if (!user) return;
 
     const fetchContent = async () => {
       try {
-        const res = await fetch(`/api/lessons?subject=${encodeURIComponent(subjectKey)}&class=${encodeURIComponent(currentClass)}`);
+        const subjectToFetch = (isSocial && part) ? part : subjectKey;
+        const res = await fetch(`/api/lessons?subject=${encodeURIComponent(subjectToFetch)}&class=${encodeURIComponent(currentClass)}`);
         const data = await res.json();
         
         let chapters = data;
@@ -73,13 +77,6 @@ export default function SubjectPage() {
             initialChapter = matched;
             setActiveTab('video');
           }
-        } else {
-          for (const ch of chapters) {
-            if (!ch.progress?.[0]?.isCompleted) {
-              initialChapter = ch;
-              break;
-            }
-          }
         }
 
         setSelectedChapter(initialChapter);
@@ -96,7 +93,7 @@ export default function SubjectPage() {
     };
 
     fetchContent();
-  }, [id, user, currentClass, subjectName]);
+  }, [id, user, currentClass, subjectKey, isSocial, part]);
 
   const handleComponentFinished = async (type: 'video' | 'quiz' | 'written') => {
     if (!selectedChapter || !selectedChapter.lessons?.[0] || !user) return;
@@ -184,24 +181,25 @@ export default function SubjectPage() {
         return;
       }
 
-      // Headings
-      if (trimmed.startsWith("###")) {
-        const hText = trimmed.replace(/^###\s*/, "");
-        elements.push(<h3 key={idx} style={{ color: "var(--primary)", marginTop: "1.2rem", marginBottom: "0.5rem", fontSize: "1.15rem" }}>{processInlines(hText)}</h3>);
-        return;
-      }
+      // Headings (Longest first)
       if (trimmed.startsWith("####")) {
         const hText = trimmed.replace(/^####\s*/, "");
         elements.push(<h4 key={idx} style={{ color: "var(--accent)", marginTop: "1rem", marginBottom: "0.4rem", fontSize: "1rem" }}>{processInlines(hText)}</h4>);
         return;
       }
+      if (trimmed.startsWith("###")) {
+        const hText = trimmed.replace(/^###\s*/, "");
+        elements.push(<h3 key={idx} style={{ color: "var(--primary)", marginTop: "1.2rem", marginBottom: "0.5rem", fontSize: "1.15rem" }}>{processInlines(hText)}</h3>);
+        return;
+      }
 
       // Bullet points
-      if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
-        const bText = trimmed.substring(2);
+      const bulletMatch = trimmed.match(/^[*+-]\s+(.*)/);
+      if (bulletMatch) {
+        const bText = bulletMatch[1];
         elements.push(
-          <div key={idx} style={{ display: "flex", gap: "8px", marginLeft: "1.2rem", marginBottom: "4px" }}>
-            <span style={{ color: "var(--primary)" }}>•</span>
+          <div key={idx} style={{ display: "flex", gap: "8px", marginLeft: "1.2rem", marginBottom: "6px" }}>
+            <span style={{ color: "var(--primary)", fontWeight: "bold" }}>•</span>
             <div style={{ flex: 1 }}>{processInlines(bText)}</div>
           </div>
         );
@@ -215,7 +213,7 @@ export default function SubjectPage() {
       }
 
       // Standard Text
-      elements.push(<div key={idx} style={{ marginBottom: "4px", lineHeight: "1.6" }}>{processInlines(line)}</div>);
+      elements.push(<div key={idx} style={{ marginBottom: "6px", lineHeight: "1.6" }}>{processInlines(line)}</div>);
     });
 
     return elements;
@@ -230,7 +228,8 @@ export default function SubjectPage() {
       const prompt = `Generate friendly, fun, and detailed chapter notes and a 2-paragraph summary for a child (Class ${currentClass}) about the chapter: "${selectedChapter.title}". 
       Use emojis, bullet points, and simple language. Keep it very encouraging!`;
       
-      const response = await getGeminiResponse(prompt, `Subject: ${subjectName}. This is for an 8-12 year old student.`);
+      const fullContext = part ? `${subjectName} (${part})` : subjectName;
+      const response = await getGeminiResponse(prompt, `Subject: ${fullContext}. This is for an 8-12 year old student.`);
       setChapterNotes(response);
     } catch (err) {
       setChapterNotes("I couldn't generate the notes right now. Try again in a bit! 🤖");
@@ -248,8 +247,30 @@ export default function SubjectPage() {
     setIsAiTyping(true);
     
     try {
-      const aiResponse = await getGeminiResponse(inputValue, `Student is learning ${id} in ${currentClass}. Currently watching: ${selectedChapter?.title}`);
-      setMessages(prev => [...prev, { role: 'ai', content: aiResponse }]);
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: inputValue,
+          context: {
+            subject: part ? `${subjectName} (${part})` : subjectName,
+            chapter: selectedChapter?.title,
+            class: currentClass
+          },
+          history: messages.map(m => ({
+            role: m.role === 'ai' ? 'model' : 'user',
+            parts: [{ text: m.content }]
+          }))
+        })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'AI Error');
+      
+      setMessages(prev => [...prev, { role: 'ai', content: data.text }]);
+    } catch (err) {
+      console.error('Chat error:', err);
+      setMessages(prev => [...prev, { role: 'ai', content: "Bhai, mera brain thoda thak gya hai. Ek baar try again? 🤖" }]);
     } finally {
       setIsAiTyping(false);
     }
@@ -469,7 +490,7 @@ export default function SubjectPage() {
                             <Star size={20} color="var(--accent)" fill="var(--accent)" /> 
                             Fun Chapter Notes & Summary
                           </h3>
-                          <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem', color: '#444', lineHeight: '1.6' }}>
+                          <div style={{ fontSize: '0.95rem', color: '#444', lineHeight: '1.6' }}>
                             {renderMarkdown(chapterNotes)}
                           </div>
                           <button 
