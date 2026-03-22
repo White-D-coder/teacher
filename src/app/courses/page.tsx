@@ -47,7 +47,7 @@ export default function CoursesPage() {
 
         <div className={styles.grid}>
           {subjects.map((subject) => (
-            <Link key={subject.id} href={`/courses/${subject.id}`} className={`glass-card ${styles.card}`}>
+            <Link key={subject.id} href={`/courses/${subject.id}/syllabus`} className={`glass-card ${styles.card}`}>
               <div className={styles.iconWrapper} style={{ backgroundColor: `${subject.color}22`, color: subject.color }}>
                 <subject.icon size={40} />
               </div>
