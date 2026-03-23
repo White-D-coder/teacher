@@ -1,0 +1,133 @@
+.container {
+  min-height: 100vh;
+  background: var(--background);
+}
+
+.main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+}
+
+.sundayBanner {
+  background: linear-gradient(90deg, var(--secondary), var(--info));
+  color: white;
+  padding: 1.5rem 2rem;
+  margin-bottom: 3rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: none;
+}
+
+.bannerInfo {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  text-align: left;
+}
+
+.reportBtn {
+  background: white;
+  color: var(--secondary);
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3rem;
+}
+
+.userProfile {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.avatar {
+  width: 80px;
+  height: 80px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--glass-shadow);
+}
+
+.userInfo h1 {
+  font-size: 2.2rem;
+}
+
+.userInfo p {
+  color: #636e72;
+}
+
+.downloadBtn {
+  background: white;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+  padding: 0.8rem 1.5rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.downloadBtn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1.5rem 2rem;
+}
+
+.statCard h3 {
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.statCard p {
+  color: #636e72;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.chartSection {
+  padding: 2.5rem;
+}
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 2rem;
+}
+
+.chartContainer {
+  width: 100%;
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: var(--radius);
+}
+
+@media (max-width: 768px) {
+  .header { flex-direction: column; gap: 1.5rem; text-align: center; }
+  .userProfile { flex-direction: column; }
+}

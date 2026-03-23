@@ -40,7 +40,7 @@ async function main() {
     await prisma.lesson.create({
       data: {
         title: "Main: Agricultural Practices",
-        videoUrl: "https://www.youtube.com/watch?v=oD5tSwKfueo",
+        videoUrl: "https://www.youtube.com/watch?v=J_cYceNpptY&t=223s",
         chapterId: chapter.id
       }
     });

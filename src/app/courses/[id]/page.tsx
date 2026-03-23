@@ -6,18 +6,22 @@ import Navbar from '@/components/Navigation/Navbar';
 import Link from 'next/link';
 import { useAuth } from '@/components/Auth/AuthContext';
 import { 
-  Play, 
-  CheckCircle, 
-  MessageSquare, 
-  Send, 
-  Sparkles, 
-  Trophy, 
-  ScanLine, 
-  FileText, 
   ChevronRight, 
+  BookOpen, 
+  PlayCircle, 
+  CheckCircle2, 
+  Lock,
+  ArrowRight,
+  Play,
+  CheckCircle,
+  ScanLine,
+  FileText,
   Video,
+  Trophy,
+  Sparkles,
   Star,
-  Lock
+  MessageSquare,
+  Send
 } from 'lucide-react';
 import { getGeminiResponse, analyzeImage } from '@/lib/gemini';
 import CustomYTPlayer from '@/components/Video/CustomYTPlayer';
@@ -45,7 +49,14 @@ export default function SubjectPage() {
   const [selectedChapter, setSelectedChapter] = useState<any>(null);
   const [selectedLesson, setSelectedLesson] = useState<any>(null);
   const [chapterNotes, setChapterNotes] = useState<string | null>(null);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
+  const [currentQuizStep, setCurrentQuizStep] = useState(0);
+  const [quizScore, setQuizScore] = useState(0);
+  const [isQuizFinished, setIsQuizFinished] = useState(false);
+  const [selectedQuizOption, setSelectedQuizOption] = useState<number | null>(null);
+  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
 
   const subjectName = getSubjectById(id as string)?.name || 'Subject';
   const subjectKey = getSubjectKeyById(id as string);
@@ -95,7 +106,18 @@ export default function SubjectPage() {
     fetchContent();
   }, [id, user, currentClass, subjectKey, isSocial, part]);
 
-  const handleComponentFinished = async (type: 'video' | 'quiz' | 'written') => {
+  // Auto-generate written questions if missing or generic
+  useEffect(() => {
+    if (activeTab === 'practice' && selectedChapter && !isGeneratingQuestions) {
+      const q = selectedChapter.writtenQuestion || "";
+      const isGeneric = !q.includes('1.') || q.includes('Write a summary of what you learned');
+      if (isGeneric) {
+        handleGenerateQuestions();
+      }
+    }
+  }, [activeTab, selectedChapter?.id]);
+
+  const handleComponentFinished = async (type: 'video' | 'quiz' | 'written', performance?: number) => {
     if (!selectedChapter || !selectedChapter.lessons?.[0] || !user) return;
     
     if (type === 'video') setVideoFinished(true);
@@ -107,7 +129,10 @@ export default function SubjectPage() {
       };
       
       if (type === 'video') payload.videoCompleted = true;
-      if (type === 'quiz') payload.quizCompleted = true;
+      if (type === 'quiz') {
+        payload.quizCompleted = true;
+        if (performance !== undefined) payload.mastery = performance;
+      }
       if (type === 'written') payload.writtenCompleted = true;
 
       const res = await fetch('/api/progress', {
@@ -126,7 +151,7 @@ export default function SubjectPage() {
         if (!updatedChapters[chIndex].progress[0]) updatedChapters[chIndex].progress[0] = { mastery: 0, isCompleted: false };
         
         // We do a soft refetch of the dashboard metrics ideally, but approximating locally:
-        // Or better yet, we can reload content from API silently
+        // Simply refetch to get the latest unlocking status from backend
         fetchContentSilently();
       }
     } catch (err) {
@@ -144,12 +169,92 @@ export default function SubjectPage() {
   };
 
 
+  const handleGenerateQuestions = async () => {
+    if (!selectedChapter || isGeneratingQuestions) return;
+    
+    setIsGeneratingQuestions(true);
+    try {
+      const res = await fetch('/api/ai/generate-written', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chapterId: selectedChapter.id,
+          chapterTitle: selectedChapter.title,
+          subject: (isSocial && part) ? part : subjectKey,
+          className: currentClass
+        })
+      });
+
+      const data = await res.json();
+      if (data.questions) {
+        // Update local state
+        setSelectedChapter({
+          ...selectedChapter,
+          writtenQuestion: data.questions
+        });
+        
+        // Update available content to keep in sync
+        const updatedContent = availableContent.map(ch => 
+          ch.id === selectedChapter.id ? { ...ch, writtenQuestion: data.questions } : ch
+        );
+        setAvailableContent(updatedContent);
+      }
+    } catch (err) {
+      console.error('Failed to generate questions:', err);
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
+  };
+
+  const handleGenerateQuiz = async () => {
+    if (!selectedChapter || isGeneratingQuiz) return;
+    
+    setIsGeneratingQuiz(true);
+    try {
+      const res = await fetch('/api/ai/generate-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject: (isSocial && part) ? part : subjectKey,
+          className: currentClass,
+          chapterId: selectedChapter.id,
+          chapterTitle: selectedChapter.title
+        })
+      });
+      const data = await res.json();
+      if (data.questions) {
+        // Update both the specific chapter and availableContent to reflect new quiz immediately
+        setSelectedChapter({ ...selectedChapter, quiz: data });
+        
+        const updatedContent = availableContent.map(c => 
+          c.id === selectedChapter.id ? { ...c, quiz: data } : c
+        );
+        setAvailableContent(updatedContent);
+
+        // Reset quiz state
+        setCurrentQuizStep(0);
+        setQuizScore(0);
+        setIsQuizFinished(false);
+      }
+    } catch (err) {
+      console.error('Failed to generate quiz:', err);
+    } finally {
+      setIsGeneratingQuiz(false);
+    }
+  };
+
   const handleSelectChapter = (chapter: any) => {
     setSelectedChapter(chapter);
     const lesson = chapter.lessons?.[0] || null;
     setSelectedLesson(lesson);
     setVideoFinished(lesson?.progress?.[0]?.videoCompleted || false);
     setActiveTab('video');
+    // Reset Quiz
+    setCurrentQuizStep(0);
+    setQuizScore(0);
+    setIsQuizFinished(false);
+    setSelectedQuizOption(null);
+    setIsCorrect(null);
   };
 
   // Helper for comprehensive markdown rendering
@@ -299,7 +404,8 @@ export default function SubjectPage() {
       setActiveTab('practice');
 
       try {
-        const result = await analyzeImage(base64Content, "Explain this answer and check if it is correct.");
+        const questionPrompt = selectedChapter?.writtenQuestion || "Explain this answer and check if it is correct.";
+        const result = await analyzeImage(base64Content, `The student is answering this specific question: "${questionPrompt}". Analyze their handwritten work and provide constructive feedback in simple Hinglish.`);
         setMessages(prev => [...prev, { role: 'ai', content: `🔍 **Scan Result:**\n${result}` }]);
         handleComponentFinished('written');
       } catch (err) {
@@ -361,12 +467,15 @@ export default function SubjectPage() {
               </button>
               <button className={activeTab === 'video' ? styles.active : ''} onClick={() => setActiveTab('video')}>
                 <Play size={18} /> Video Lessons
+                {selectedChapter?.lessons?.every((l: any) => l.progress?.[0]?.videoCompleted) && <CheckCircle2 size={14} color="#4CAF50" style={{ marginLeft: '6px' }} />}
               </button>
               <button className={activeTab === 'quiz' ? styles.active : ''} onClick={() => setActiveTab('quiz')}>
                 <CheckCircle size={18} /> Chapter Quiz
+                {selectedChapter?.quizCompleted && <CheckCircle2 size={14} color="#4CAF50" style={{ marginLeft: '6px' }} />}
               </button>
               <button className={activeTab === 'practice' ? styles.active : ''} onClick={() => setActiveTab('practice')}>
                 <ScanLine size={18} /> Written Practice
+                {selectedChapter?.writtenCompleted && <CheckCircle2 size={14} color="#4CAF50" style={{ marginLeft: '6px' }} />}
               </button>
             </nav>
 
@@ -380,13 +489,12 @@ export default function SubjectPage() {
                   {availableContent.length > 0 ? (
                     <div className={styles.fullRoadmapWrapper}>
                       <Roadmap 
-                        chapters={availableContent.map((v, index) => ({
-                          id: v.id,
-                          title: v.title,
-                          isCompleted: v.progress?.[0]?.isCompleted || false,
-                          isUnlocked: index === 0 || (availableContent[index - 1]?.progress?.[0]?.isCompleted === true),
-                          order: index + 1,
-                          supplements: v.supplements || []
+                        chapters={availableContent.map((v: any, index: number) => ({
+                          ...v,
+                          // Use values from backend if present, fallback for safety
+                          isCompleted: v.isCompleted || false,
+                          isUnlocked: v.isUnlocked || false,
+                          order: v.order || index + 1
                         }))}
                         onChapterClick={handleSelectChapter}
                         activeChapterId={selectedChapter?.id}
@@ -512,19 +620,203 @@ export default function SubjectPage() {
                 </div>
               ) : activeTab === 'quiz' ? (
                 <div className={styles.quizArea}>
-                  <h3>Brain Challenge! 🧠</h3>
-                  <div className={styles.lockedState} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <Trophy size={48} color="var(--accent)" />
-                    <p>Earn questions by watching the video!</p>
-                    <button onClick={() => handleComponentFinished('quiz')} className={styles.finishBtn} style={{ marginTop: '20px' }}>
-                      Mark Quiz Completed (Debug)
-                    </button>
-                  </div>
+                  {!selectedChapter?.quiz?.questions || selectedChapter.quiz.questions.length === 0 ? (
+                    <div className={styles.lockedState} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3rem' }}>
+                      <Lock size={48} color="var(--border)" />
+                      <p style={{ marginTop: '1rem', color: '#666', marginBottom: '1.5rem' }}>No quiz found for this chapter yet.</p>
+                      <button 
+                        onClick={handleGenerateQuiz}
+                        disabled={isGeneratingQuiz}
+                        className={styles.advanceBtn}
+                        style={{
+                          background: 'var(--primary)',
+                          color: 'white',
+                          padding: '0.8rem 1.5rem',
+                          borderRadius: 'var(--radius)',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          opacity: isGeneratingQuiz ? 0.7 : 1
+                        }}
+                      >
+                        <Sparkles size={18} />
+                        {isGeneratingQuiz ? 'Generating...' : 'Start New Quiz AI ✨'}
+                      </button>
+                    </div>
+                  ) : isQuizFinished ? (
+                    <div className={styles.lockedState} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3rem' }}>
+                      <Trophy size={64} style={{ color: "var(--accent)", marginBottom: '1.5rem' }} />
+                      <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{Math.round((quizScore / selectedChapter.quiz.questions.length) * 100)}% Mastery! 🏆</h2>
+                      <p style={{ marginBottom: '2rem', color: '#666' }}>You got {quizScore} out of {selectedChapter.quiz.questions.length} correct!</p>
+                      <div style={{ display: 'flex', gap: '15px' }}>
+                        <button onClick={() => { 
+                          handleComponentFinished('quiz', Math.round((quizScore / selectedChapter.quiz.questions.length) * 100)); 
+                          setActiveTab('index'); 
+                        }} className={styles.finishBtn}>Finish & Save Progress</button>
+                        <button onClick={() => { setCurrentQuizStep(0); setQuizScore(0); setIsQuizFinished(false); setSelectedQuizOption(null); setIsCorrect(null); }} style={{ background: 'transparent', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0.8rem 1.5rem', borderRadius: 'var(--radius)', cursor: 'pointer' }}>Try Again</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={styles.activeQuiz}>
+                      <div className={styles.quizHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                          <span style={{ fontSize: '0.9rem', color: '#666' }}>Question {currentQuizStep + 1} of {selectedChapter.quiz.questions.length}</span>
+                          <button 
+                            onClick={handleGenerateQuiz}
+                            disabled={isGeneratingQuiz}
+                            style={{ 
+                              background: 'transparent', 
+                              border: 'none', 
+                              color: 'var(--primary)', 
+                              fontSize: '0.85rem', 
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              opacity: isGeneratingQuiz ? 0.5 : 1
+                            }}
+                          >
+                            <Sparkles size={14} /> {isGeneratingQuiz ? 'Generating...' : 'New Quiz AI ✨'}
+                          </button>
+                        </div>
+                        <div style={{ height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', width: '200px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', background: 'var(--primary)', width: `${((currentQuizStep + 1) / selectedChapter.quiz.questions.length) * 100}%`, transition: 'width 0.3s ease' }} />
+                        </div>
+                      </div>
+
+                      <div className={styles.questionCard}>
+                        <h2 style={{ fontSize: '1.4rem', marginBottom: '1.5rem', lineHeight: '1.4' }}>{selectedChapter.quiz.questions[currentQuizStep].text}</h2>
+                        
+                        {selectedChapter.quiz.questions[currentQuizStep].imageUrl && (
+                          <div style={{ marginBottom: '1.5rem', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                            <img src={selectedChapter.quiz.questions[currentQuizStep].imageUrl} alt="Quiz Visual" style={{ width: '100%', height: 'auto', display: 'block' }} />
+                          </div>
+                        )}
+
+                        <div className={styles.optionsGrid} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px' }}>
+                          {selectedChapter.quiz.questions[currentQuizStep].options.map((option: string, idx: number) => {
+                            let style: any = { padding: '1.2rem', borderRadius: '12px', borderStyle: 'solid', borderWidth: '2px', borderColor: 'var(--border)', cursor: 'pointer', transition: 'all 0.2s', background: 'rgba(255,255,255,0.5)', textAlign: 'left', fontSize: '1.05rem', color: 'inherit' };
+                            
+                            if (selectedQuizOption !== null) {
+                              if (idx === selectedChapter.quiz.questions[currentQuizStep].correctAnswer) {
+                                style.background = 'rgba(76, 175, 80, 0.1)';
+                                style.borderColor = '#4CAF50';
+                              } else if (idx === selectedQuizOption) {
+                                style.background = 'rgba(244, 67, 54, 0.1)';
+                                style.borderColor = '#F44336';
+                              }
+                            }
+
+                            return (
+                              <button 
+                                key={idx} 
+                                style={style} 
+                                disabled={selectedQuizOption !== null}
+                                onClick={() => {
+                                  setSelectedQuizOption(idx);
+                                  const correct = idx === selectedChapter.quiz.questions[currentQuizStep].correctAnswer;
+                                  setIsCorrect(correct);
+                                  if (correct) setQuizScore(prev => prev + 1);
+                                }}
+                              >
+                                {option}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {selectedQuizOption !== null && (
+                          <div className={`animate-fade-in`} style={{ marginTop: '2rem', padding: '1.5rem', borderRadius: '12px', background: isCorrect ? 'rgba(76, 175, 80, 0.05)' : 'rgba(244, 67, 54, 0.05)', borderLeft: `5px solid ${isCorrect ? '#4CAF50' : '#F44336'}` }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
+                              {isCorrect ? <Sparkles size={20} color="#4CAF50" /> : <div style={{ color: '#F44336', fontWeight: 'bold' }}>Oops!</div>}
+                              <strong style={{ color: isCorrect ? '#2E7D32' : '#C62828' }}>{isCorrect ? "Shabash! That's correct!" : "Not quite right!"}</strong>
+                            </div>
+                            <p style={{ color: '#555', fontSize: '0.95rem' }}>{selectedChapter.quiz.questions[currentQuizStep].explanation}</p>
+                            <button 
+                              onClick={() => {
+                                if (currentQuizStep + 1 < selectedChapter.quiz.questions.length) {
+                                  setCurrentQuizStep(prev => prev + 1);
+                                  setSelectedQuizOption(null);
+                                  setIsCorrect(null);
+                                } else {
+                                  setIsQuizFinished(true);
+                                }
+                              }} 
+                              className={styles.finishBtn} 
+                              style={{ marginTop: '1.5rem', width: 'auto' }}
+                            >
+                              {currentQuizStep + 1 < selectedChapter.quiz.questions.length ? 'Next Question ➡️' : 'See Results 🏆'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className={styles.practiceArea}>
                   <h3>Teacher AI Checker 📝</h3>
-                  <p>Upload a photo of your written answer and I'll check it for you!</p>
+                  <div style={{ background: 'rgba(255, 230, 109, 0.05)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--accent)', marginBottom: '1.5rem', position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <h4 style={{ color: 'var(--primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Star size={18} fill="var(--accent)" color="var(--accent)" /> 
+                        Chapter Challenge Set (5 Questions)
+                      </h4>
+                      <button 
+                        onClick={handleGenerateQuestions}
+                        disabled={isGeneratingQuestions}
+                        className={styles.aiButton}
+                        style={{ 
+                          fontSize: '0.8rem', 
+                          padding: '6px 12px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px',
+                          background: 'white',
+                          border: '1px solid #ddd',
+                          borderRadius: '20px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          opacity: isGeneratingQuestions ? 0.6 : 1
+                        }}
+                      >
+                        <Sparkles size={14} color="var(--accent)" />
+                        {isGeneratingQuestions ? 'Generating...' : 'New Challenge AI ✨'}
+                      </button>
+                    </div>
+                    
+                    {isGeneratingQuestions ? (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+                        <div className={styles.pulseLoader}></div>
+                        <p style={{ marginTop: '1rem' }}>Teacher AI is thinking of fresh challenges for you...</p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {(selectedChapter?.writtenQuestion || "").split('\n').filter((q: string) => q.trim().match(/^\d+\./)).map((q: string, idx: number) => (
+                          <div key={idx} style={{ background: 'white', padding: '1rem', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', borderLeft: `4px solid ${q.includes('[Easy]') ? '#4CAF50' : q.includes('[Medium]') ? '#FF9800' : '#F44336'}` }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: q.includes('[Easy]') ? '#4CAF50' : q.includes('[Medium]') ? '#FF9800' : '#F44336', display: 'block', marginBottom: '4px' }}>
+                              {q.includes('[Easy]') ? '🟢 Easy' : q.includes('[Medium]') ? '🟠 Medium' : '🔴 Hard'}
+                            </span>
+                            <p style={{ fontSize: '1rem', color: '#111', fontWeight: 500 }}>{q.replace(/^\d+\.\s*\[.*?\]\s*/, '')}</p>
+                          </div>
+                        ))}
+                        {!(selectedChapter?.writtenQuestion || "").includes('1.') && (
+                          <p style={{ fontSize: '1.1rem', fontWeight: 500, color: '#333' }}>
+                            {selectedChapter?.writtenQuestion || "Write a summary of what you learned in this chapter."}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <p style={{ color: '#444', fontWeight: 600 }}>📝 Where to write?</p>
+                    <ol style={{ marginLeft: '1.5rem', color: '#555', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                      <li>Take a blank piece of paper or your notebook.</li>
+                      <li>Write the answer to the challenge above by hand.</li>
+                      <li>Click the box below to scan/upload a photo of your page!</li>
+                    </ol>
+                  </div>
                   
                   <div className={styles.scanControls}>
                     <label className={`${styles.uploadBox} ${isAnalyzing ? styles.loading : ''}`}>

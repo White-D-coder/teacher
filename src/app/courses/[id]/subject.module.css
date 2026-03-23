@@ -446,6 +446,32 @@
   opacity: 0.5;
 }
 
+.aiButton:hover {
+  border-color: var(--accent) !important;
+  background-color: rgba(255, 230, 109, 0.1) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 230, 109, 0.2);
+}
+
+.aiButton:active {
+  transform: translateY(0);
+}
+
+.pulseLoader {
+  width: 40px;
+  height: 40px;
+  background-color: var(--accent);
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0.5; }
+}
+
 @media (max-width: 1024px) {
   .layout { grid-template-columns: 1fr; }
   .aiSiderbar { min-height: 500px; }

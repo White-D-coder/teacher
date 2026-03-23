@@ -12,6 +12,8 @@ import styles from './courses.module.css';
 export default function CoursesPage() {
   const { user, updateClass } = useAuth();
   const [selectedClass, setSelectedClass] = useState('Class 7');
+  const [subjectStats, setSubjectStats] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user?.class) {
@@ -19,12 +21,33 @@ export default function CoursesPage() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/dashboard/stats?userId=${user.id}&class=${encodeURIComponent(selectedClass)}`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setSubjectStats(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch dashboard stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [user?.id, selectedClass]);
+
   const handleClassChange = (newClass: string) => {
     setSelectedClass(newClass);
     updateClass(newClass);
   };
 
-  const subjects = getSubjectsForClass(selectedClass);
+  const subjectMeta = getSubjectsForClass(selectedClass);
 
   return (
     <div className={styles.container}>
@@ -53,22 +76,36 @@ export default function CoursesPage() {
         </header>
 
         <div className={styles.grid}>
-          {subjects.map((subject) => (
-            <Link key={subject.id} href={`/courses/${subject.id}/syllabus`} className={`glass-card ${styles.card}`}>
-              <div className={styles.iconWrapper} style={{ backgroundColor: `${subject.color}22`, color: subject.color }}>
-                <subject.icon size={40} />
-              </div>
-              <h3>{subject.name}</h3>
-              <div className={styles.stats}>
-                <span>12 Videos</span>
-                <span>•</span>
-                <span>0% Done</span>
-              </div>
-              <div className={styles.progressContainer}>
-                <div className={styles.progressBar} style={{ width: `0%`, backgroundColor: subject.color }}></div>
-              </div>
-            </Link>
-          ))}
+          {subjectMeta.map((meta) => {
+            const stats = subjectStats.find(s => s.subjectName === meta.name) || {
+              totalVideos: 0,
+              progressPercent: 0
+            };
+
+            return (
+              <Link key={meta.id} href={`/courses/${meta.id}/syllabus`} className={`glass-card ${styles.card}`}>
+                <div className={styles.iconWrapper} style={{ backgroundColor: `${meta.color}22`, color: meta.color }}>
+                  <meta.icon size={40} />
+                </div>
+                <h3>{meta.name}</h3>
+                <div className={styles.stats}>
+                  <span>{stats.totalVideos} Videos</span>
+                  <span>•</span>
+                  <span>{stats.progressPercent}% Done</span>
+                </div>
+                <div className={styles.progressContainer}>
+                  <div 
+                    className={styles.progressBar} 
+                    style={{ 
+                      width: `${stats.progressPercent}%`, 
+                      backgroundColor: meta.color,
+                      boxShadow: stats.progressPercent > 0 ? `0 0 10px ${meta.color}44` : 'none'
+                    }}
+                  ></div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </main>
     </div>

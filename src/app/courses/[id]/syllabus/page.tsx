@@ -71,11 +71,16 @@ export default function SyllabusPage() {
           </header>
 
           <div className={styles.selectionGrid}>
-            {[
+            {(currentClass === 'Class 9' ? [
+              { name: 'History', icon: '📜', color: '#ff7e67', desc: 'India & Contemporary World - I' },
+              { name: 'Geography', icon: '🏔️', color: '#4facfe', desc: 'Contemporary India - I' },
+              { name: 'Civics', icon: '🗳️', color: '#f9d423', desc: 'Democratic Politics - I' },
+              { name: 'Economics', icon: '💰', color: '#6ab04c', desc: 'Understanding Economics' }
+            ] : [
               { name: 'History', icon: '📜', color: '#ff7e67', desc: 'Our Pasts - III' },
               { name: 'Geography', icon: '🏔️', color: '#4facfe', desc: 'Resources & Development' },
               { name: 'Civics', icon: '🗳️', color: '#f9d423', desc: 'Social & Political Life' }
-            ].map(part => (
+            ]).map(part => (
               <div 
                 key={part.name} 
                 className={`glass-card ${styles.selectionCard}`} 

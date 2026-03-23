@@ -1,0 +1,169 @@
+.roadmapContainer {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 0;
+  position: relative;
+  background: transparent;
+  border-radius: 20px;
+}
+
+.roadmapContainer::-webkit-scrollbar {
+  width: 4px;
+}
+
+.roadmapContainer::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+
+.svgLine {
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
+.pathBg {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.05);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.pathProgress {
+  fill: none;
+  stroke: #FF6B6B;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 10 10;
+  opacity: 0.2;
+}
+
+.node {
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.node:hover {
+  filter: brightness(1.05);
+}
+
+.nodeBg {
+  fill: white;
+  stroke: var(--primary-color, #FF6B6B);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 8px rgba(255, 107, 107, 0.4));
+}
+
+.active .nodeBg {
+  fill: var(--primary-color, #FF6B6B);
+  stroke: white;
+  r: 15;
+}
+
+.active .nodeNumber {
+  fill: white;
+  font-weight: bold;
+}
+
+.locked {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.locked .nodeBg {
+  fill: #f0f0f0;
+  stroke: #ccc;
+  filter: none;
+}
+
+.nodeNumber {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  fill: var(--text-color, #333);
+  pointer-events: none;
+}
+
+.labelWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  width: max-content;
+  max-width: 240px;
+}
+
+.lessonTitle {
+  font-size: 13px;
+  color: var(--foreground);
+  white-space: normal; /* Allow wrapping if needed, but better to keep it clean */
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.lockIcon {
+  color: #b2bec3;
+}
+
+.doneIcon {
+  color: #4ECDC4;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.pathProgress {
+  animation: dash 2s linear infinite;
+}
+
+.supplementNode {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.supplementNode:hover circle {
+  fill: white;
+}
+
+.suppLabelObj {
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.supplementNode:hover .suppLabelObj {
+  opacity: 1;
+}
+
+.supplementNode:hover .suppTooltip {
+  background: white;
+}
+
+.milestone {
+  filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.6));
+}
+
+.milestone .labelWrapper {
+  background: linear-gradient(135deg, #FFF9E6 0%, #FFFFFF 100%);
+  border: 2px solid #FFD700;
+  box-shadow: 0 6px 15px rgba(255, 215, 0, 0.2);
+}
+
+.grandChallenge {
+  color: #945D00 !important;
+  font-weight: 800 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 11px !important;
+}

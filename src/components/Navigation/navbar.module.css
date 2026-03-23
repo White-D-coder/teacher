@@ -1,0 +1,77 @@
+.navbar {
+  height: 70px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.logo a {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-weight: 700;
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.links {
+  display: flex;
+  gap: 2rem;
+}
+
+.links a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #636e72;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  transition: all 0.3s ease;
+}
+
+.links a:hover, .active {
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--primary) !important;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #2d3436;
+  background: #f1f2f6;
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius);
+}
+
+.logoutBtn {
+  background: transparent;
+  color: #b2bec3;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.logoutBtn:hover {
+  background: #ffeaa7;
+  color: #d63031;
+}
+
+@media (max-width: 768px) {
+  .links span, .profile span { display: none; }
+}
