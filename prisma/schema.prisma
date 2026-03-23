@@ -28,6 +28,8 @@ model Subject {
   name     String
   class    String
   chapters Chapter[]
+
+  @@unique([name, class])
 }
 
 model Chapter {
@@ -35,11 +37,32 @@ model Chapter {
   title       String
   subjectId   String       @db.ObjectId
   orderIndex  Int
+  writtenQuestion String?
   
   subject     Subject      @relation(fields: [subjectId], references: [id])
   lessons     Lesson[]
   supplements Supplement[]
+  quiz        Quiz?
   progress    ChapterProgress[]
+}
+
+model Quiz {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  chapterId String     @unique @db.ObjectId
+  questions Question[]
+  chapter   Chapter    @relation(fields: [chapterId], references: [id])
+}
+
+model Question {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  quizId        String   @db.ObjectId
+  text          String
+  options       String[] // 4 options
+  correctAnswer Int      // index 0-3
+  imageUrl      String?  // For visual quizzes
+  explanation   String?
+  
+  quiz          Quiz     @relation(fields: [quizId], references: [id])
 }
 
 model Lesson {

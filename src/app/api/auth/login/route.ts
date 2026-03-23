@@ -17,22 +17,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
     
-    const isValid = await bcrypt.compare(secretCode, user.password);
+    const isValid = await bcrypt.compare(secretCode, (user as any).password);
     if (!isValid) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
     // Streak Logic
-    let newStreak = user.streakCount;
+    let newStreak = (user as any).streakCount || 0;
     const now = new Date();
-    const lastActive = new Date(user.lastActiveDate);
+    const lastActive = (user as any).lastActiveDate ? new Date((user as any).lastActiveDate) : now;
     const diffHours = Math.abs(now.getTime() - lastActive.getTime()) / 36e5;
     
     if (diffHours > 24 && diffHours < 48) {
       newStreak++;
     } else if (diffHours >= 48) {
       newStreak = 1;
-    } else if (user.streakCount === 0) {
+    } else if ((user as any).streakCount === 0) {
       newStreak = 1;
     }
 
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       name: updatedUser.name, 
       class: updatedUser.class, 
       role: updatedUser.role,
-      streakCount: updatedUser.streakCount
+      streakCount: (updatedUser as any).streakCount || 0
     });
 
     response.cookies.set('auth_token', token, {
