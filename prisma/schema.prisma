@@ -106,8 +106,10 @@ model ChapterProgress {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   userId      String   @db.ObjectId
   chapterId   String   @db.ObjectId
-  mastery     Float    @default(0) // 0-100
-  isCompleted Boolean  @default(false)
+  mastery          Float    @default(0) // 0-100
+  quizCompleted    Boolean  @default(false)
+  writtenCompleted Boolean  @default(false)
+  isCompleted      Boolean  @default(false)
   
   user        User     @relation(fields: [userId], references: [id])
   chapter     Chapter  @relation(fields: [chapterId], references: [id])

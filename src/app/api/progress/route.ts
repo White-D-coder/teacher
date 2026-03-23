@@ -14,62 +14,73 @@ export async function POST(request: Request) {
     const isQuizDone = quizCompleted ?? (existingProgress as any)?.quizCompleted ?? false;
     const isWrittenDone = writtenCompleted ?? (existingProgress as any)?.writtenCompleted ?? false;
 
-    // Calculate Mastery for this specific lesson
-    // We treat the 3 components equally (Video, Quiz, Written)
-    // If a specific mastery is provided (e.g. from quiz), we can factor it in
-    let completionFlags = 0;
-    if (isVideoDone) completionFlags++;
-    if (isQuizDone) completionFlags++;
-    if (isWrittenDone) completionFlags++;
-    
-    // Simple mastery: (Flags/3) * 100. 
-    // If they finished a quiz with 80%, we still treat 'Quiz' as a 1/3 contribution.
-    const mastery = Math.round((completionFlags / 3) * 100);
-
-    const progress = await prisma.userProgress.upsert({
+    // 1. Update UserProgress (Video only)
+    const progress = await (prisma.userProgress as any).upsert({
       where: { userId_lessonId: { userId, lessonId } },
       update: {
-        videoCompleted: isVideoDone,
-        quizCompleted: isQuizDone,
-        writtenCompleted: isWrittenDone,
-        mastery,
-        completedAt: mastery === 100 ? new Date() : null
+        videoCompleted: videoCompleted ?? undefined,
+        // Quiz/Written no longer needed in UserProgress but keeping for legacy
+        quizCompleted: quizCompleted ?? undefined,
+        writtenCompleted: writtenCompleted ?? undefined,
       },
       create: {
         userId,
         lessonId,
-        videoCompleted: isVideoDone,
-        quizCompleted: isQuizDone,
-        writtenCompleted: isWrittenDone,
-        mastery,
-        completedAt: mastery === 100 ? new Date() : null
+        videoCompleted: videoCompleted ?? false,
+        quizCompleted: quizCompleted ?? false,
+        writtenCompleted: writtenCompleted ?? false,
       }
     });
 
-    // Automatically recalculate ChapterProgress
-    const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }});
+    // 2. Automatically recalculate ChapterProgress
+    const lesson = await (prisma.lesson as any).findUnique({ 
+      where: { id: lessonId },
+      include: { chapter: true }
+    });
+
     if (lesson) {
-      const chapterId = (lesson as any).chapterId;
-      const allLessons = await prisma.lesson.findMany({ where: { chapterId }});
+      const chapterId = lesson.chapterId;
       
-      if (allLessons.length > 0) {
-        let totalMastery = 0;
-        for (const l of allLessons) {
-          const lp = await prisma.userProgress.findUnique({
-            where: { userId_lessonId: { userId, lessonId: l.id } }
-          });
-          totalMastery += (lp as any)?.mastery ?? 0;
+      // Get all lessons for this chapter
+      const allLessons = await (prisma.lesson as any).findMany({ 
+        where: { chapterId },
+        include: { progress: { where: { userId } } }
+      });
+      
+      const totalVideos = allLessons.filter((l: any) => l.videoUrl).length; // Only count lessons with videos
+      const completedVideos = allLessons.filter((l: any) => l.progress?.[0]?.videoCompleted).length;
+      
+      const videoScore = totalVideos > 0 ? (completedVideos / totalVideos) * 100 : 100;
+
+      // Get/Update ChapterProgress
+      const existingChapterProg = await (prisma.chapterProgress as any).findUnique({
+        where: { userId_chapterId: { userId, chapterId } }
+      });
+
+      const isQuizDone = quizCompleted ?? existingChapterProg?.quizCompleted ?? false;
+      const isWrittenDone = writtenCompleted ?? existingChapterProg?.writtenCompleted ?? false;
+
+      // Final Mastery: (VideoScore + QuizScore + WrittenScore) / 3
+      const mastery = Math.round((videoScore + (isQuizDone ? 100 : 0) + (isWrittenDone ? 100 : 0)) / 3);
+      const isCompleted = mastery === 100;
+
+      await (prisma.chapterProgress as any).upsert({
+        where: { userId_chapterId: { userId, chapterId } },
+        update: { 
+          mastery, 
+          isCompleted,
+          quizCompleted: isQuizDone,
+          writtenCompleted: isWrittenDone
+        },
+        create: { 
+          userId, 
+          chapterId, 
+          mastery, 
+          isCompleted,
+          quizCompleted: isQuizDone,
+          writtenCompleted: isWrittenDone
         }
-
-        const chapterMastery = Math.round(totalMastery / allLessons.length);
-        const isCompleted = chapterMastery === 100;
-
-        await prisma.chapterProgress.upsert({
-          where: { userId_chapterId: { userId, chapterId } },
-          update: { mastery: chapterMastery, isCompleted },
-          create: { userId, chapterId, mastery: chapterMastery, isCompleted }
-        });
-      }
+      });
     }
 
     return NextResponse.json(progress);

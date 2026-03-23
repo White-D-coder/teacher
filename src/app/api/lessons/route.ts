@@ -53,7 +53,40 @@ export async function GET(request: Request) {
 
     if (!subject) return NextResponse.json([]);
 
-    return NextResponse.json(subject.chapters);
+    // 4. Calculate isUnlocked logic
+    const chapters = subject.chapters.map((chapter: any, index: number) => {
+      const prog = chapter.progress?.[0];
+      const isCompleted = prog?.isCompleted || false;
+      const mastery = prog?.mastery || 0;
+      const quizCompleted = prog?.quizCompleted || false;
+      const writtenCompleted = prog?.writtenCompleted || false;
+
+      // Unlocking Logic:
+      // First chapter is always unlocked.
+      // Subsequent chapters unlock if the PREVIOUS one is completed.
+      let isUnlocked = false;
+      if (index === 0) {
+        isUnlocked = true;
+      } else {
+        const prevChapter = subject.chapters[index - 1];
+        const prevProg = prevChapter.progress?.[0];
+        if (prevProg?.isCompleted) {
+          isUnlocked = true;
+        }
+      }
+
+      return {
+        ...chapter,
+        isCompleted,
+        isUnlocked,
+        mastery,
+        quizCompleted,
+        writtenCompleted,
+        order: chapter.orderIndex // Map to the frontend 'order' property
+      };
+    });
+
+    return NextResponse.json(chapters);
   } catch (error: any) {
     console.error('Fetch lessons error:', error);
     return NextResponse.json({ 
