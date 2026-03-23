@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       name: user.name,
       class: user.class,
       role: user.role,
-      streakCount: user.streakCount
+      streakCount: (user as any).streakCount || 0
     });
 
     response.cookies.set('auth_token', token, {
