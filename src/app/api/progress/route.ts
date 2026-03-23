@@ -3,23 +3,28 @@ import prisma from '@/lib/prisma';
 
 export async function POST(request: Request) {
   try {
-    const { userId, lessonId, videoCompleted, quizCompleted, writtenCompleted } = await request.json();
+    const { userId, lessonId, videoCompleted, quizCompleted, writtenCompleted, mastery: providedMastery } = await request.json();
     
     // Fetch existing progress
     const existingProgress = await prisma.userProgress.findUnique({
       where: { userId_lessonId: { userId, lessonId } }
     });
 
-    const isVideoDone = videoCompleted ?? existingProgress?.videoCompleted ?? false;
-    const isQuizDone = quizCompleted ?? existingProgress?.quizCompleted ?? false;
-    const isWrittenDone = writtenCompleted ?? existingProgress?.writtenCompleted ?? false;
+    const isVideoDone = videoCompleted ?? (existingProgress as any)?.videoCompleted ?? false;
+    const isQuizDone = quizCompleted ?? (existingProgress as any)?.quizCompleted ?? false;
+    const isWrittenDone = writtenCompleted ?? (existingProgress as any)?.writtenCompleted ?? false;
 
     // Calculate Mastery for this specific lesson
-    let flags = 0;
-    if (isVideoDone) flags++;
-    if (isQuizDone) flags++;
-    if (isWrittenDone) flags++;
-    const mastery = Math.round((flags / 3) * 100);
+    // We treat the 3 components equally (Video, Quiz, Written)
+    // If a specific mastery is provided (e.g. from quiz), we can factor it in
+    let completionFlags = 0;
+    if (isVideoDone) completionFlags++;
+    if (isQuizDone) completionFlags++;
+    if (isWrittenDone) completionFlags++;
+    
+    // Simple mastery: (Flags/3) * 100. 
+    // If they finished a quiz with 80%, we still treat 'Quiz' as a 1/3 contribution.
+    const mastery = Math.round((completionFlags / 3) * 100);
 
     const progress = await prisma.userProgress.upsert({
       where: { userId_lessonId: { userId, lessonId } },
@@ -44,7 +49,7 @@ export async function POST(request: Request) {
     // Automatically recalculate ChapterProgress
     const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }});
     if (lesson) {
-      const chapterId = lesson.chapterId;
+      const chapterId = (lesson as any).chapterId;
       const allLessons = await prisma.lesson.findMany({ where: { chapterId }});
       
       if (allLessons.length > 0) {
@@ -53,7 +58,7 @@ export async function POST(request: Request) {
           const lp = await prisma.userProgress.findUnique({
             where: { userId_lessonId: { userId, lessonId: l.id } }
           });
-          totalMastery += lp?.mastery ?? 0;
+          totalMastery += (lp as any)?.mastery ?? 0;
         }
 
         const chapterMastery = Math.round(totalMastery / allLessons.length);

@@ -13,6 +13,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
   }
 
+  console.log(`Fetching lessons for Subject: ${subjectName}, Class: ${targetClass}`);
+
   try {
     const authHeader = request.headers.get('cookie');
     const tokenMatch = authHeader?.match(/auth_token=([^;]+)/);
@@ -21,7 +23,7 @@ export async function GET(request: Request) {
     let userId = null;
     if (token) {
       const decoded: any = verifyToken(token);
-      if (decoded && decoded.id) {
+      if (decoded && decoded.id && /^[0-9a-fA-F]{24}$/.test(decoded.id)) {
         userId = decoded.id;
       }
     }
@@ -34,11 +36,16 @@ export async function GET(request: Request) {
           include: {
             lessons: {
               include: {
-                progress: userId ? { where: { userId } } : false
+                progress: userId ? { where: { userId } } : undefined
               }
             },
             supplements: true,
-            progress: userId ? { where: { userId } } : false
+            quiz: {
+              include: {
+                questions: true
+              }
+            },
+            progress: userId ? { where: { userId } } : undefined
           }
         }
       }
@@ -47,9 +54,13 @@ export async function GET(request: Request) {
     if (!subject) return NextResponse.json([]);
 
     return NextResponse.json(subject.chapters);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Fetch lessons error:', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Server error', 
+      details: error.message,
+      stack: error.stack 
+    }, { status: 500 });
   }
 }
 

@@ -1,50 +1,78 @@
-import { NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
-import prisma from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('cookie');
-    const tokenMatch = authHeader?.match(/auth_token=([^;]+)/);
-    const token = tokenMatch ? tokenMatch[1] : null;
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
+    const className = searchParams.get("class");
 
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!userId || !className) {
+      return NextResponse.json({ error: "Missing userId or class" }, { status: 400 });
+    }
 
-    const decoded: any = verifyToken(token);
-    if (!decoded || !decoded.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const userId = decoded.id;
-    const user = await prisma.user.findUnique({ where: { id: userId }});
-
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-
-    // Aggregate Subject Mastery
-    // To get Subject mastery, find all Chapters per subject, avg the mastery.
+    // 1. Get all subjects for this class
     const subjects = await prisma.subject.findMany({
-      where: { class: user.class },
-      include: { chapters: true }
+      where: { class: className },
+      include: {
+        chapters: {
+          include: {
+            lessons: true,
+          },
+        },
+      },
     });
 
-    const subjectProgress = await Promise.all(subjects.map(async (subj) => {
-      let total = 0;
-      for (const ch of subj.chapters) {
-        const cp = await prisma.chapterProgress.findUnique({
-          where: { userId_chapterId: { userId, chapterId: ch.id } }
+    // 2. Get user progress for these lessons
+    const userProgress = await prisma.userProgress.findMany({
+      where: { userId: userId },
+    });
+
+    // 3. Define the subjects we want to show on the dashboard (from lib/constants)
+    const dashboardSubjects = ["Math", "Science", "Social Science", "English", "Hindi", "Musical World"];
+
+    // 4. Aggregate stats
+    const stats = dashboardSubjects.map((subName) => {
+      let totalVideos = 0;
+      let completedVideos = 0;
+
+      // Filter subjects that belong to this dashboard category
+      // For 'Social Science', we include History, Geography, Civics, Economics
+      const relevantSubjects = subjects.filter((s: any) => {
+        if (subName === "Social Science") {
+          return s.name === "Social Science" || ["History", "Geography", "Civics", "Economics"].includes(s.name);
+        }
+        return s.name === subName;
+      });
+
+      relevantSubjects.forEach((subject: any) => {
+        subject.chapters.forEach((chapter: any) => {
+          totalVideos += chapter.lessons.length;
+          
+          chapter.lessons.forEach((lesson: any) => {
+            const progress = userProgress.find((p: any) => p.lessonId === lesson.id);
+            // @ts-ignore - Prisma types might be out of sync in IDE
+            if (progress?.videoCompleted) {
+              completedVideos++;
+            }
+          });
         });
-        total += cp?.mastery ?? 0;
-      }
-      return {
-        subject: subj.name,
-        mastery: subj.chapters.length > 0 ? Math.round(total / subj.chapters.length) : 0
-      };
-    }));
+      });
 
-    return NextResponse.json({
-      streakCount: user.streakCount,
-      nextReport: 'In 2 days', // Static as requested
-      subjectProgress
+      const progressPercent = totalVideos > 0 ? Math.round((completedVideos / totalVideos) * 100) : 0;
+
+      return {
+        subjectName: subName,
+        totalVideos,
+        completedVideos,
+        progressPercent,
+      };
     });
-  } catch (error) {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+
+    return NextResponse.json(stats);
+
+  } catch (error: any) {
+    console.error("❌ Dashboard Stats Error:", error);
+    return NextResponse.json({ error: "Failed to fetch stats", details: error.message }, { status: 500 });
   }
 }
