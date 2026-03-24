@@ -486,6 +486,54 @@
   }
 }
 
+@media (max-width: 768px) {
+  .indexArea {
+    padding: 1.5rem 1rem;
+  }
+
+  .roadmapHeader h3 {
+    font-size: 1rem;
+  }
+
+  .modalOverlay {
+    padding: 0.5rem;
+  }
+
+  .challengeModal {
+    border-radius: 1.2rem;
+    max-height: 95vh;
+  }
+
+  .challengeHeader {
+    padding: 1rem 1.5rem;
+  }
+
+  .challengeTitleArea {
+    gap: 0.8rem;
+  }
+
+  .challengeIcon {
+    width: 35px;
+    height: 35px;
+  }
+
+  .challengeBody {
+    padding: 1rem;
+  }
+
+  .challengeQuestionCard {
+    padding: 1.2rem 1rem;
+  }
+
+  .qText {
+    font-size: 1rem;
+  }
+
+  .challengeFooter {
+    padding: 1.5rem 1rem;
+  }
+}
+
 /* Weekly Challenge Modal */
 .modalOverlay {
   position: fixed;
