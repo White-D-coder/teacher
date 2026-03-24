@@ -135,3 +135,18 @@
   align-items: center;
   gap: 1rem;
 }
+
+.skipGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.skipLabel {
+  font-size: 0.7rem;
+  font-weight: 800;
+  margin-left: -12px;
+  margin-right: 8px;
+  padding-top: 2px;
+  pointer-events: none;
+}

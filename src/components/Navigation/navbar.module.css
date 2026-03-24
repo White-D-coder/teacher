@@ -73,5 +73,26 @@
 }
 
 @media (max-width: 768px) {
+  .navbar {
+    padding: 0 1rem;
+    height: 60px;
+  }
+  
+  .links {
+    gap: 0.5rem;
+  }
+
+  .links a {
+    padding: 0.5rem;
+  }
+
   .links span, .profile span { display: none; }
+  
+  .actions {
+    gap: 0.8rem;
+  }
+
+  .profile {
+    padding: 0.4rem 0.6rem;
+  }
 }
