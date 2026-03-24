@@ -55,6 +55,8 @@ export default function SubjectPage() {
   const [currentQuizStep, setCurrentQuizStep] = useState(0);
   const [quizScore, setQuizScore] = useState(0);
   const [isQuizFinished, setIsQuizFinished] = useState(false);
+  const [activeChallenge, setActiveChallenge] = useState<any>(null);
+  const [isGeneratingChallenge, setIsGeneratingChallenge] = useState(false);
   const [selectedQuizOption, setSelectedQuizOption] = useState<number | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
 
@@ -243,7 +245,36 @@ export default function SubjectPage() {
     }
   };
 
-  const handleSelectChapter = (chapter: any) => {
+  const handleSelectChapter = async (chapter: any) => {
+    // 1. Check if it's a Milestone (Grand Challenge)
+    if (chapter.title.includes('Grand Challenge')) {
+      // Extract week number from "Week X: Grand Challenge ⭐"
+      const weekMatch = chapter.title.match(/Week (\d+)/);
+      const weekNumber = weekMatch ? weekMatch[1] : "1";
+      
+      setIsGeneratingChallenge(true);
+      try {
+        const res = await fetch('/api/challenges', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            className: currentClass,
+            subjectName: (isSocial && part) ? part : subjectKey,
+            weekNumber: weekNumber
+          })
+        });
+        const data = await res.json();
+        if (data.questions) {
+          setActiveChallenge(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch weekly challenge:', err);
+      } finally {
+        setIsGeneratingChallenge(false);
+      }
+      return; 
+    }
+
     setSelectedChapter(chapter);
     const lesson = chapter.lessons?.[0] || null;
     setSelectedLesson(lesson);
@@ -879,6 +910,64 @@ export default function SubjectPage() {
           </aside>
         </div>
       </main>
+      {/* Weekly Challenge Modal */}
+      {(activeChallenge || isGeneratingChallenge) && (
+        <div className={styles.modalOverlay}>
+          <div className={`glass-card ${styles.challengeModal}`}>
+            <div className={styles.challengeHeader}>
+              <div className={styles.challengeTitleArea}>
+                <Trophy className={styles.challengeIcon} />
+                <div>
+                  <h2>{activeChallenge?.title || 'Weekly Challenge'} 🏆</h2>
+                  <p>{isGeneratingChallenge ? 'AI is curating your weekly assessment...' : `Class ${user?.class} | ${activeChallenge?.subject}`}</p>
+                </div>
+              </div>
+              {!isGeneratingChallenge && (
+                <button className={styles.closeBtn} onClick={() => setActiveChallenge(null)}>×</button>
+              )}
+            </div>
+
+            {isGeneratingChallenge ? (
+              <div className={styles.loadingArea}>
+                <div className={styles.spinner}></div>
+                <p>Fetching from DPPs & Previous Year Papers...</p>
+              </div>
+            ) : (
+              <div className={styles.challengeBody}>
+                <div className={styles.challengeIntro}>
+                  <p>Welcome to this week's Grand Challenge! We've picked 5 high-impact questions from your recently covered chapters. Good luck!</p>
+                </div>
+                
+                <div className={styles.questionList}>
+                  {activeChallenge.questions.map((q: any, idx: number) => (
+                    <div key={q.id} className={styles.challengeQuestionCard}>
+                      <div className={styles.qHeader}>
+                        <span className={styles.qNumber}>Question {idx + 1}</span>
+                        <div className={styles.tags}>
+                          <span className={`${styles.tag} ${styles[q.difficulty.toLowerCase()]}`}>
+                            {q.difficulty}
+                          </span>
+                          <span className={styles.sourceTag}>{q.sourceType}</span>
+                        </div>
+                      </div>
+                      <p className={styles.qText}>{q.text}</p>
+                      <div className={styles.hintArea}>
+                        <strong>Teacher's Hint:</strong> {q.answer || "Write a detailed explanation covering all core concepts."}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className={styles.challengeFooter}>
+                  <button className="btn-primary" onClick={() => setActiveChallenge(null)}>
+                    I'm Ready to Solve! 🚀
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

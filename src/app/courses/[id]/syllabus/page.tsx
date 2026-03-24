@@ -130,7 +130,7 @@ export default function SyllabusPage() {
           ) : chapters.length > 0 ? (
             chapters.map((chapter, index) => {
               const isCompleted = chapter.progress?.[0]?.isCompleted || false;
-              const isUnlocked = index === 0 || (chapters[index - 1]?.progress?.[0]?.isCompleted === true);
+              const isUnlocked = chapter.isUnlocked;
 
               return (
                 <div 
