@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const SYSTEM_PROMPT = `You are an expert NCERT Indian School Teacher. 
 Your task is to generate 5 high-quality written practice questions for a specific chapter.
@@ -17,12 +18,12 @@ Format the output exactly like this (plain text):
 
 Keep questions age-appropriate, professional, and directly related to the NCERT curriculum topics.`;
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "");
 
 export async function POST(request: Request) {
   try {
     const { chapterId, chapterTitle, subject, className } = await request.json();
+    console.log(`[DEBUG] Generating written questions for ${chapterTitle} (${subject})`);
 
     if (!chapterTitle || !subject || !className) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -38,26 +39,33 @@ Chapter: ${chapterTitle}
 Subject: ${subject}
 Class: ${className}`;
 
+    console.log("[DEBUG] Calling Gemini for written practice...");
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const questionsText = response.text().trim();
 
-    if (!questionsText) {
-      throw new Error("AI failed to generate questions");
-    }
-
     // Optional: Save to DB so they persist until refreshed manually
-    if (chapterId) {
-      await prisma.chapter.update({
-        where: { id: chapterId },
-        data: { writtenQuestion: questionsText }
-      });
+    if (chapterId && chapterId.length === 24) { // Basic MongoDB ObjectID length check
+      console.log(`[DEBUG] Updating chapter ${chapterId} with new questions...`);
+      try {
+        await (prisma as any).chapter.update({
+          where: { id: chapterId },
+          data: { writtenQuestion: questionsText }
+        });
+      } catch (dbErr: any) {
+        console.warn("[DEBUG] Non-critical DB Error saving written questions:", dbErr.message);
+      }
     }
 
+    console.log("[DEBUG] Successfully generated written questions.");
     return NextResponse.json({ questions: questionsText });
 
   } catch (error: any) {
-    console.error("❌ AI Generation Error:", error);
-    return NextResponse.json({ error: "Failed to generate questions", details: error.message }, { status: 500 });
+    console.error("❌ Written Practice AI Error:", error);
+    return NextResponse.json({ 
+      error: "Failed to generate written questions", 
+      details: error.message,
+      stack: error.stack 
+    }, { status: 500 });
   }
 }
