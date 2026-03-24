@@ -116,3 +116,26 @@ model ChapterProgress {
   
   @@unique([userId, chapterId])
 }
+
+model Challenge {
+  id        String              @id @default(auto()) @map("_id") @db.ObjectId
+  title     String              // e.g. "Week 2 Challenge"
+  class     String
+  subject   String              // e.g. "Science"
+  weekNumber Int
+  questions ChallengeQuestion[]
+  createdAt  DateTime          @default(now())
+
+  @@unique([class, subject, weekNumber])
+}
+
+model ChallengeQuestion {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  challengeId String    @db.ObjectId
+  text        String
+  difficulty  String    // Easy, Medium, Hard
+  sourceType  String    // DPP, PYQ, Generated
+  answer      String?   
+  
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+}
