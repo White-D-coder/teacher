@@ -62,18 +62,8 @@ export async function GET(request: Request) {
       const writtenCompleted = prog?.writtenCompleted || false;
 
       // Unlocking Logic:
-      // First chapter is always unlocked.
-      // Subsequent chapters unlock if the PREVIOUS one is completed.
-      let isUnlocked = false;
-      if (index === 0) {
-        isUnlocked = true;
-      } else {
-        const prevChapter = subject.chapters[index - 1];
-        const prevProg = prevChapter.progress?.[0];
-        if (prevProg?.isCompleted) {
-          isUnlocked = true;
-        }
-      }
+      // USER REQUEST: Unlock all chapters data
+      let isUnlocked = true;
 
       return {
         ...chapter,
